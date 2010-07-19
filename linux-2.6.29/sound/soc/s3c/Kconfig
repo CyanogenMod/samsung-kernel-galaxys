@@ -1,0 +1,89 @@
+config SND_S5P_SOC
+	tristate "Samsung SoC Audio"
+	depends on ARCH_S5PC1XX || ARCH_S5PC11X || ARCH_S5P64XX
+	help
+	  Say Y or M if you want to add support for codecs attached to
+	  the S3C AC97, I2S or SSP interface. You will also need
+	  to select the audio interfaces to support below.
+
+config SND_S3C_I2S_V50
+	tristate
+
+config SND_S3C_AC97
+	tristate
+config SND_S3C_PCMDEV
+	tristate
+
+config  SND_C110_PCM
+        tristate "PCM-wm8994 device"
+        depends on ARCH_S5PC11X && SND_UNIVERSAL_WM8994
+        select SND_S3C_PCMDEV
+       select SND_SOC_WM8994_PCM
+
+choice
+	prompt "Select the codec driver"
+	depends on SND_S5P_SOC
+
+config  SND_SMDKC110_WM8580
+	tristate "WM8580-I2S on SMDKC110"
+	depends on ARCH_S5PC11X
+	select SND_S3C_I2S_V50
+	select SND_SOC_WM8580
+
+config  SND_UNIVERSAL_WM8994
+	tristate "WM8994-I2S on UNIVERSAL"
+	depends on ARCH_S5PC11X
+	select SND_S3C_I2S_V50
+	select SND_SOC_WM8994
+
+config	SND_UNIVERSAL_WM8994_MASTER
+	bool "WM8994 master"
+	depends on SND_UNIVERSAL_WM8994
+	default y
+
+config  SND_SMDKC100_WM8580
+	tristate "WM8580-I2S on SMDKC100"
+	depends on ARCH_S5PC1XX
+	select SND_S3C_I2S_V50
+	select SND_SOC_WM8580
+
+config  SND_SMDKC110_WM8580_PCM
+	tristate "WM8580-PCM on SMDKC110"
+	depends on ARCH_S5PC11X
+	select SND_S3C_PCMDEV
+	select SND_SOC_WM8580_PCM 
+
+config  SND_SMDKC100_S5M8751
+	tristate "S5M8751-I2S on SMDKC100"
+	depends on ARCH_S5PC1XX
+	select SND_S3C_I2S_V32
+	select SND_SOC_S5M8751
+
+config  SND_SMDKC100_WM9713
+	tristate "WM9713-AC97 on SMDKC100"
+	depends on ARCH_S5PC1XX
+	select SND_S3C_AC97
+	select SND_SOC_WM9713
+
+config SND_S5PC100_SOC_UNIVERSAL_AK4671
+	tristate "SoC I2S Audio support for UNIVERSAL - AK4671"
+	depends on ARCH_S5PC1XX
+	select SND_S3C_I2S_V50
+	select SND_SOC_AK4671
+	select SND_SOC_MAX9877
+	help
+	  Say Y if you want to add support for SoC audio on universal
+	  with the AK4671.
+
+config  SND_SMDK6442_WM8580
+	tristate "WM8580-I2S on SMDK6442"
+	depends on ARCH_S5P64XX
+	select SND_S3C_I2S_V50
+	select SND_SOC_WM8580
+
+endchoice
+
+config  SND_WM8580_MASTER
+	bool "WM8580 Codec is I2S Master"
+	depends on SND_SMDKC110_WM8580 || SND_SMDKC100_WM8580 || SND_SMDK6442_WM8580
+	default n

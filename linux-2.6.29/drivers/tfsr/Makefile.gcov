@@ -1,0 +1,16 @@
+#
+# Makefile.gcov for FSR code coverage
+#
+
+CFLAGS_tfsr_base.o += $(GCOV_FLAGS)
+CFLAGS_tfsr_block.o += $(GCOV_FLAGS)
+CFLAGS_tfsr_blkdev.o += $(GCOV_FLAGS)
+
+# OS
+CFLAGS_FSR_OAM_Linux.o += $(GCOV_FLAGS)
+
+# Platform
+CFLAGS_FSR_PAM_ApollonPLUS.o += $(GCOV_FLAGS)
+
+# Overwrite CC to prevent compiler cache (ccache)
+CC = $(CROSS_COMPILE)gcc

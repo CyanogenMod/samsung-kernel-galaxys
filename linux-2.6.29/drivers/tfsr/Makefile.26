@@ -1,0 +1,38 @@
+#
+#   Makefile for eXtended Sector Remapper (FSR) driver on kernel 2.6
+#
+#   Copyright(C) 2004-2006, Samsung Electronics, Co., Ltd.
+#
+
+# FSR base module
+obj-$(CONFIG_TINY_FSR)			+= tfsr.o
+
+# Should keep the build sequence. (fsr_base -> bml_block)
+tfsr-objs	:= tfsr_base.o tfsr_block.o tfsr_blkdev.o
+
+# This objects came from FSR, It will be never modified.
+tfsr-objs	+= Core/BML/FSR_BML_ROInterface.o 
+tfsr-objs	+= Core/BML/FSR_BML_BIFCommon.o 
+
+tfsr-objs	+= Core/BML/FSR_BML_BBMCommon.o Core/BML/FSR_BML_BBMMount.o 
+
+tfsr-objs	+= LLD/FlexOND/FSR_LLD_FlexOND.o 
+tfsr-objs       += LLD/OND/FSR_LLD_SWEcc.o LLD/OND/FSR_LLD_OneNAND.o
+tfsr-objs       += LLD/OND/FSR_LLD_4K_OneNAND.o
+tfsr-objs	+= OAM/Linux/FSR_OAM_Linux.o
+
+# Please add your platform here
+ifeq ($(CONFIG_MACH_OMAP_APOLLON),y)
+tfsr-objs   += PAM/ApollonPLUS/FSR_PAM_ApollonPLUS.o
+else
+tfsr-objs   += PAM/s5pc110/FSR_PAM_s5pc110.o
+endif #CONFIG_MACH_OMAP_APOLLON
+
+ifeq ($(CONFIG_ARM),y)
+tfsr-objs   += PAM/s5pc110/FSR_PAM_asm.o
+else
+tfsr-objs   += PAM/s5pc110/FSR_PAM_Memcpy.o
+endif #CONFIG_ARM
+
+tfsr-objs	+= Misc/FSR_Version.o Misc/FSR_DBG_Zone.o 
+

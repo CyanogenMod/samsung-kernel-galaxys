@@ -1,0 +1,44 @@
+#
+# Unified Flash Device configuration
+#
+
+menu "TinyFSR Support for cramfs"
+
+config TINY_FSR
+	bool "Using TinyFSR for Cramfs"
+	default y
+	help
+	  eXtended Sector Remapper device
+
+choice
+	depends on TINY_FSR
+	prompt "OneNAND type"
+	default ONENAND
+
+config ONENAND
+	bool "OneNAND 2K page"
+	
+config ONENAND_4K
+	bool "OneNAND 4K page"
+
+config FLEXOND
+	bool "FlexOneNAND"
+
+endchoice
+
+config TINY_FLASH_PHYS_ADDR
+        hex "Flex-OneNAND flash Physical Location"
+        depends on TINY_FSR
+        default "0xB0000000"
+        help
+          This is the physical address in your flash memory the fsr will
+          be linked for and stored to.  This address is dependent on your
+          own flash usage.
+
+config LINUSTOREIII_TINY_DEBUG_VERBOSE
+	int "LinuStoreIII Tiny Debugging verbosity (0 = quiet, 3 = noisy)"
+	depends on TINY_FSR
+	default 0
+
+endmenu
+

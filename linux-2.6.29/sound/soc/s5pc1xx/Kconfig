@@ -1,0 +1,87 @@
+menu "SoC Audio for the Samsung S3C"
+	depends on ARCH_S5PC1XX
+
+config SND_S5PC1XX_SOC
+	tristate "SoC Audio for the Samsung S3C chips"
+	depends on ARCH_S5PC1XX
+	select SND_PCM
+	help
+	  Say Y or M if you want to add support for codecs attached to
+	  the S3C AC97, I2S or SSP interface. You will also need
+	  to select the audio interfaces to support below.
+
+config SND_S3C_SOC_I2S
+	tristate
+
+config SND_SOC_I2S_V50
+	tristate
+
+config SND_S5PC100_SOC_SPDIF
+	tristate
+
+config SND_SMDKC100_WM8580
+	tristate "SoC I2S Audio support for SMDKC100 - WM8580"
+	depends on SND_S5PC1XX_SOC && MACH_SMDKC100
+	select SND_SOC_I2S_V50
+	select SND_SOC_WM8580
+	help
+	  Say Y if you want to add support for SoC audio on smdk6410
+	  with the WM8580.
+	
+choice
+        prompt "SMDK Record Path Select"
+	depends on SND_SMDKC100_WM8580
+
+config SOUND_S5PC100_WM8580_INPUT_STREAM_LINE
+	bool "Input Stream is LINE-IN"
+	depends on SND_SMDKC100_WM8580
+	help
+	  Say Y here to make input stream as LINE-IN.
+
+config SOUND_S5PC100_WM8580_INPUT_STREAM_MIC
+	bool "Input Stream is MIC"
+	depends on SND_SMDKC100_WM8580
+	help
+	  Say Y here to make input stream as MIC.
+endchoice
+
+config SND_SMDKC100_WM9713
+        tristate "SoC AC97 Audio support for SMDKC100 - WM9713"
+        depends on SND_S5PC1XX_SOC && MACH_SMDKC100
+        select SND_S5PC100_SOC_AC97
+        select SND_SOC_WM9713
+        help
+          Say Y if you want to add support for SoC audio on SMDKC100
+          with the WM9713.
+
+choice
+        prompt "SMDK Record Path Select"
+        depends on SND_SMDKC100_WM9713 
+
+config SOUND_S5PC100_WM9713_INPUT_STREAM_LINE
+        bool "Input Stream is LINE-IN"
+        depends on SND_SMDKC100_WM9713
+        help
+          Say Y here to make input stream as LINE-IN.
+
+config SOUND_S5PC100_WM9713_INPUT_STREAM_MIC
+        bool "Input Stream is MIC"
+        depends on SND_SMDKC100_WM9713
+        help
+          Say Y here to make input stream as MIC.
+endchoice
+
+config SND_S5PC100_SOC_AC97
+        tristate
+        select AC97_BUS
+        select SND_AC97_CODEC
+        select SND_SOC_AC97_BUS
+        
+config SND_SMDKC100_SPDIF
+		tristate "SoC SPDIF Audio support for SMDKC100"
+		depends on SND_S5PC1XX_SOC && MACH_SMDKC100
+		select SND_S5PC100_SOC_SPDIF
+		help
+          Say Y if you want to add support for SoC audio on SMDKC100
+          with the SPDIF.
+endmenu

@@ -1,0 +1,20 @@
+#
+# Accelerometer Sensor Configuration
+#
+
+
+
+config ACCEL                                                              
+	bool "Accelerometer Sensor"
+	default y
+	help
+	This option enables accelerometer sensors  
+	   
+config ACCEL_SMB380
+	depends on ACCEL
+	tristate "ACCEL_SMB380 driver for s5pc110"
+	default y
+	help
+	  This option enables accelerometer sensors using bma020 driver.
+	  It is optimized for s3c6410.
+
