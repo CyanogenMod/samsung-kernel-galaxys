@@ -8,9 +8,7 @@ case "$1" in
 		echo "* Clean Kernel                                                                 *"
 		echo "********************************************************************************"
 
-		pushd linux-2.6.29
 		make clean
-		popd
 		pushd modules
 		make clean
 		popd
@@ -30,7 +28,7 @@ fi
 TOOLCHAIN=`pwd`/../arm-2009q3/bin/
 TOOLCHAIN_PREFIX=arm-none-eabi-
 
-KERNEL_BUILD_DIR=linux-2.6.29
+KERNEL_BUILD_DIR=$(PWD)
 
 export PRJROOT=$PWD
 export PROJECT_NAME
