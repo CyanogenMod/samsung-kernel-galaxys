@@ -1,4 +1,0 @@
-config REBOOT_INFORM 
-	bool " support"
-	help
-	  Say Y here to enable reboot parameter access. 
