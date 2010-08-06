@@ -10,7 +10,7 @@
 		$ ./build_kernel.sh
 
 2. Output files
-	- Kernel : linux-2.6.29/arch/arm/boot/zImage
+	- Kernel : arch/arm/boot/zImage
 	- module : modules/*/*.ko
 
 3. How to Clean
