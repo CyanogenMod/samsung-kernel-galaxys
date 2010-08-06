@@ -1,0 +1,86 @@
+/* arch/arm/mach-s5pc100/include/mach/regs-mem.h
+ *
+ * Copyright (c) 2004 Simtec Electronics <linux@simtec.co.uk>
+ *		http://www.simtec.co.uk/products/SWLINUX/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * S5PC100 Memory Control register definitions
+*/
+
+#ifndef __ASM_ARM_MEMREGS_H
+#define __ASM_ARM_MEMREGS_H
+
+#ifndef S5PC1XX_MEMREG
+#define S5PC1XX_MEMREG(x) (S5PC1XX_VA_SROMC + (x))
+#endif
+
+
+/* Bank Idle Cycle Control Registers 0-5 */
+#define S5PC1XX_SROM_BW		S5PC1XX_MEMREG(0x00)
+
+#define S5PC1XX_SROM_BC0	S5PC1XX_MEMREG(0x04)
+#define S5PC1XX_SROM_BC1	S5PC1XX_MEMREG(0x08)
+#define S5PC1XX_SROM_BC2	S5PC1XX_MEMREG(0x0C)
+#define S5PC1XX_SROM_BC3	S5PC1XX_MEMREG(0x10)
+#define S5PC1XX_SROM_BC4	S5PC1XX_MEMREG(0x14)
+#define S5PC1XX_SROM_BC5	S5PC1XX_MEMREG(0x18)
+
+/* SROM BW */
+#define S5PC1XX_SROM_BW_DATA_WIDTH0_8BIT	(0 << 0)
+#define S5PC1XX_SROM_BW_DATA_WIDTH0_16BIT	(1 << 0)
+#define S5PC1XX_SROM_BW_DATA_WIDTH0_MASK	(1 << 0)
+
+#define S5PC1XX_SROM_BW_WAIT_ENABLE0_DISABLE	(0 << 2)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE0_ENABLE	(1 << 2)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE0_MASK	(1 << 2)
+
+#define S5PC1XX_SROM_BW_BYTE_ENABLE0_DISABLE	(0 << 3)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE0_ENABLE	(1 << 3)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE0_MASK	(1 << 3)
+
+#define S5PC1XX_SROM_BW_DATA_WIDTH1_8BIT	(0 << 4)
+#define S5PC1XX_SROM_BW_DATA_WIDTH1_16BIT	(1 << 4)
+#define S5PC1XX_SROM_BW_DATA_WIDTH1_MASK	(1 << 4)
+
+#define S5PC1XX_SROM_BW_WAIT_ENABLE1_DISABLE	(0 << 6)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE1_ENABLE	(1 << 6)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE1_MASK	(1 << 6)
+
+#define S5PC1XX_SROM_BW_BYTE_ENABLE1_DISABLE	(0 << 7)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE1_ENABLE	(1 << 7)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE1_MASK	(1 << 7)
+
+#define S5PC1XX_SROM_BW_DATA_WIDTH2_8BIT	(0 << 8)
+#define S5PC1XX_SROM_BW_DATA_WIDTH2_16BIT	(1 << 8)
+#define S5PC1XX_SROM_BW_DATA_WIDTH2_MASK	(1 << 8)
+
+#define S5PC1XX_SROM_BW_DATA_WIDTH3_8BIT	(0 << 12)
+#define S5PC1XX_SROM_BW_DATA_WIDTH3_16BIT	(1 << 12)
+#define S5PC1XX_SROM_BW_DATA_WIDTH3_MASK	(1 << 12)
+
+#define S5PC1XX_SROM_BW_ADDR_MODE3_HWORD_ADDR	(0 << 13)
+#define S5PC1XX_SROM_BW_ADDR_MODE3_BYTE_ADDR	(1 << 13)
+#define S5PC1XX_SROM_BW_ADDR_MODE3_MASK		(1 << 13)
+
+#define S5PC1XX_SROM_BW_WAIT_ENABLE3_DISABLE	(0 << 14)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE3_ENABLE	(1 << 14)
+#define S5PC1XX_SROM_BW_WAIT_ENABLE3_MASK	(1 << 14)
+
+#define S5PC1XX_SROM_BW_BYTE_ENABLE3_DISABLE	(0 << 15)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE3_ENABLE	(1 << 15)
+#define S5PC1XX_SROM_BW_BYTE_ENABLE3_MASK	(1 << 15)
+
+/* SROM BCn */
+#define S5PC1XX_SROM_BCn_TACS(x)		(x << 28)
+#define S5PC1XX_SROM_BCn_TCOS(x)		(x << 24)
+#define S5PC1XX_SROM_BCn_TACC(x)		(x << 16)
+#define S5PC1XX_SROM_BCn_TCOH(x)		(x << 12)
+#define S5PC1XX_SROM_BCn_TCAH(x)		(x << 8)
+#define S5PC1XX_SROM_BCn_TACP(x)		(x << 4)
+#define S5PC1XX_SROM_BCn_PMC_NORMAL		(0 << 0)
+#define S5PC1XX_SROM_BCn_PMC_4			(1 << 0)
+
+#endif /* __ASM_ARM_MEMREGS_H */

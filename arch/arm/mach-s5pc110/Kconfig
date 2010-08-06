@@ -1,0 +1,177 @@
+# arch/arm/mach-s5pc110/Kconfig
+#
+# Copyright 2008 Openmoko, Inc.
+# Copyright 2008 Simtec Electronics
+#
+# Licensed under GPLv2
+
+# Configuration options for the S5PC110 CPU
+
+config CPU_S5PC110
+	bool
+	select CPU_S5PC110_INIT
+	select CPU_S5PC110_CLOCK
+	help
+	  Enable S5PC110 CPU support
+
+config S5PC11X_SETUP_SDHCI
+        bool
+        help
+          Internal helper functions for S5PC1XX based SDHCI systems
+
+config MACH_SMDKC110
+	bool
+	select CPU_S5PC110
+	select S3C_DMA_PL330
+	select S3C_DEV_I2C1
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3       
+	select S5PC11X_SETUP_SDHCI
+	select ARCH_DISCONTIGMEM_ENABLE
+	help
+	  Machine support for the Samsung SMDKC110
+config MACH_S5PC110_P1P2
+	bool
+	select CPU_S5PC110
+	select S3C_DMA_PL330
+	select S3C_DEV_I2C1
+	select S3C_DEV_HSMMC2
+	select S5PC11X_SETUP_SDHCI
+	select ARCH_DISCONTIGMEM_ENABLE
+	help
+	  Machine support for the UNIVERSAL P1P2 
+
+config SEC_INTERNAL_STORAGE
+        bool "Select SEC_INTERNAL_STORAGE"
+        select S3C_DEV_HSMMC
+        help
+          Provides support for samsung internal storage
+	
+	 
+config MACH_S5PC110_JUPITER
+	bool
+	select CPU_S5PC110
+	select S3C_DMA_PL330
+	select S3C_DEV_I2C1
+	select S3C_DEV_HSMMC1
+	select S3C_DEV_HSMMC2
+	select S5PC11X_SETUP_SDHCI
+	select ARCH_DISCONTIGMEM_ENABLE
+	help
+	  Machine support for the UNIVERSAL JUPITER 
+
+
+choice
+        prompt "Setup CPU Type for S5PC110"
+        depends on PLAT_S5PC11X
+	default S5PC110_H_TYPE
+
+
+config S5PC110_H_TYPE
+        bool "Select H-Type"
+        depends on PLAT_S5PC11X
+        help
+					Select H-Type of S5PC110
+
+config S5PC110_AC_TYPE
+        bool "select AC-Type"
+        depends on PLAT_S5PC11X
+        help
+					Select AC-Type of S5PC110
+endchoice
+
+choice
+	prompt "Select S5PC110 BOARD TYPE "
+	depends on PLAT_S5PC11X
+	default S5PC110_JUPITER
+
+config 	S5PC110_JUPITER_BOARD
+	bool "S5PC110_JUPITER"
+	select MACH_S5PC110_JUPITER
+	help
+		select UNIVRSAL_JUPITER Board 
+
+config 	S5PC110_P1P2_BOARD
+	bool "S5PC110_P1P2"
+	select MACH_S5PC110_P1P2
+	help
+		select UNIVRSAL_P1P2 Board 
+
+config	SMDKC110_BOARD
+	bool "Select SMDKC110_BOARD"
+	select MACH_SMDKC110
+	help
+		select SMDKC110
+
+endchoice
+
+choice
+        prompt "Select JUPITER BOARD VERSION "
+config JUPITER_VER_B3
+        bool "Select JUPITER VERSION B3"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select H-Type of S5PC110
+
+config JUPITER_VER_B4
+        bool "select JUPITER VERSION B4"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110
+                                        
+config JUPITER_VER_B5
+        bool "select JUPITER VERSION B5"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110   
+
+config ARIES_VER_B0
+        bool "select ARIES VERSION B0"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110   
+
+config ARIES_VER_B1
+        bool "select ARIES VERSION B1"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110   
+
+config ARIES_VER_B2
+        bool "select ARIES VERSION B2"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110   
+                                        
+config ARIES_VER_B3
+        bool "select ARIES VERSION B3"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110  
+endchoice
+
+choice
+        prompt "Select JUPITER RAM SIZE "
+config DDR_RAM_3G
+        bool "Select DDR RAM 3G"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select H-Type of S5PC110
+
+config DDR_RAM_2G
+        bool "select DDR RAM 2G"
+        depends on S5PC110_JUPITER_BOARD
+        help
+                                        Select AB-Type of S5PC110
+                                        
+endchoice
+
+config SEC_HEADSET
+        tristate "SEC 2 Wire detection driver"
+        default n
+        help
+         Provides support for detecting SEC 2 wire devices, such as wired
+         headset.
+
