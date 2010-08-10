@@ -1151,10 +1151,19 @@ static long pmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		DLOG("connect\n");
 		return pmem_connect(arg, file);
 		break;
-#if 1
-	// added by jamie (2009.10.20)
-	// to provide cache invalidate function
-	case PMEM_CACHE_INV:
+
+	case PMEM_CACHE_FLUSH:
+		{
+			struct pmem_region region;
+			if (copy_from_user(&region, (void __user *)arg,
+						sizeof(struct pmem_region)))
+				return -EFAULT;
+			flush_pmem_file(file, region.offset, region.len);
+			break;
+		}
+	case PMEM_CLEAN_INV_CACHES:
+	case PMEM_CLEAN_CACHES:
+	case PMEM_INV_CACHES:
 		{
 			struct pmem_region region;
 			if (copy_from_user(&region, (void __user *)arg, sizeof(struct pmem_region)))
