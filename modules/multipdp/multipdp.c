@@ -1459,13 +1459,13 @@ static int multipdp_demux(char *buf, int size)
 
 	if (dev == NULL) {
 		printk("========================================= : (1)\n");
-		yhexdump((char*)&hdr, sizeof(struct pdp_hdr));		
+	//	yhexdump((char*)&hdr, sizeof(struct pdp_hdr));		
 		printk("========================================= : (2)\n");
-		yhexdump((char*)buf, size);	
+	//	yhexdump((char*)buf, size);	
 		printk("========================================= : (3)\n");
 		EPRINTK("invalid id: %u, there is no existing device.\n", hdr.id);
 
-		multipdp_dump();
+		// TEMP_BLOCK multipdp_dump();
 		ret = -ENODEV;
 		goto err;
 	}
@@ -1486,7 +1486,7 @@ static int multipdp_demux(char *buf, int size)
 			if( len > 1500 )
 			{	
 				printk("-------------> len is [%d]\n", len);
-				multipdp_dump();
+				// TEMP_BLOCK multipdp_dump();
 			}
 			//printk("multipdp_demux:vnet_recv(VNET) (1): len = %d\n", len);
 			ret = multipdp_vnet_recv(dev, (char *)&buf[sizeof(struct pdp_hdr)],  len);
@@ -1497,7 +1497,7 @@ static int multipdp_demux(char *buf, int size)
 			break;
 		default:
 			printk("-------------> type invalid [%d]\n", dev->type);
-			multipdp_dump();
+			// TEMP_BLOCK multipdp_dump();
 			ret = -1;
 	}
 

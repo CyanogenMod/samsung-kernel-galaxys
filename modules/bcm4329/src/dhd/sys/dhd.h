@@ -148,6 +148,12 @@ typedef struct dhd_pub {
 	/* Last error from dongle */
 	int dongle_error;
 
+	/* Early Suspend Status */
+	int early_suspended;
+
+	/* DHCP period */
+	int dhcp_in_progress;
+
 	uint8 country_code[WLC_CNTRY_BUF_SZ];
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
 	struct wake_lock wakelock[WAKE_LOCK_MAX];

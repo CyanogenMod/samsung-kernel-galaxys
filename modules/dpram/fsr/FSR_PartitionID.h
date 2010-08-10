@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -34,6 +40,10 @@
 #define _FSR_PARTITION_ID_H_
 /*****************************************************************************/
 /* Partition ID of FSR_BML_LoadPIEntry()                                     */
+/*---------------------------------------------------------------------------*/
+/* Partition IDs from 20 to 29 are reserved for STL                          */
+/* Partition IDs from 10 to 19 are reserved for WB corresponding to STL      */
+/* Partition IDs (0xFFD0 - 0xFFFD) are reserved in BML                       */
 /*****************************************************************************/
 #define     FSR_PARTID_MASK                 0xFFFF  /* Partition ID MASK     */
 #define     FSR_PARTID_BML0                 0       /* Partition ID 0        */
@@ -66,12 +76,17 @@
 #define     FSR_PARTID_BML27                27      /* Partition ID 27       */
 #define     FSR_PARTID_BML28                28      /* Partition ID 28       */
 #define     FSR_PARTID_BML29                29      /* Partition ID 29       */
-#define     FSR_PARTID_BML30                30      /* Partition ID 30       */
-#define     FSR_PARTID_BML31                31      /* Partition ID 31       */
-#define     FSR_PARTID_BML32                32      /* Partition ID 32       */
-#define     FSR_PARTID_BML33                33      /* Partition ID 33       */
-#define     FSR_PARTID_BML34                34      /* Partition ID 34       */
-#define     FSR_PARTID_BML35                35      /* Partition ID 35       */
+
+
+/* Partition IDs for WB correspoding to STL */
+#define     FSR_PARTID_STL0_WB              (FSR_PARTID_BML10)
+#define     FSR_PARTID_STL1_WB              (FSR_PARTID_BML11)
+#define     FSR_PARTID_STL2_WB              (FSR_PARTID_BML12)
+#define     FSR_PARTID_STL3_WB              (FSR_PARTID_BML13)
+#define     FSR_PARTID_STL4_WB              (FSR_PARTID_BML14)
+#define     FSR_PARTID_STL5_WB              (FSR_PARTID_BML15)
+#define     FSR_PARTID_STL6_WB              (FSR_PARTID_BML16)
+#define     FSR_PARTID_STL7_WB              (FSR_PARTID_BML17)
 
 
 /* Partition IDs for STL */
@@ -83,20 +98,8 @@
 #define     FSR_PARTID_STL5                 (FSR_PARTID_BML25)
 #define     FSR_PARTID_STL6                 (FSR_PARTID_BML26)
 #define     FSR_PARTID_STL7                 (FSR_PARTID_BML27)
-#define     FSR_PARTID_STL8                 (FSR_PARTID_BML28)
-#define     FSR_PARTID_STL9                 (FSR_PARTID_BML29)
-#define     FSR_PARTID_STL10                (FSR_PARTID_BML30)
-#define     FSR_PARTID_STL11                (FSR_PARTID_BML31)
-#define     FSR_PARTID_STL12                (FSR_PARTID_BML32)
-#define     FSR_PARTID_STL13                (FSR_PARTID_BML33)
-#define     FSR_PARTID_STL14                (FSR_PARTID_BML34)
-#define     FSR_PARTID_STL15                (FSR_PARTID_BML35)
 
-#define     FSR_MAX_STL_PARTITIONS          (FSR_PARTID_STL15 - FSR_PARTID_STL0 + 1)
-
-
-/* 
- * Dummy Partition IDs
+/* dummy partition ID
  * DO NOT use these IDs. these IDs are used internally 
  */
 #define     FSR_PARTID_DUMMY0               (0xFFD0)
@@ -131,11 +134,13 @@
 #define     FSR_PARTID_DUMMY29              (0xFFFD)
 
 
+#define     FSR_PARTID_BOOTLOADER           (FSR_PARTID_BML0) /* NAND bootloader */
+
 /*****************************************************************************/
 /* User can customize FSR PARTITION ID using                                 */
-/* - FSR_PARTID_BMLxx & FSR_PARTID_STLxx                                     */
+/* - FSR_PARTID_BML1 ~ FSR_PARTID_BML19                                      */
+/* - FSR_PARTID_STL0 ~ FSR_PARTID_STL7                                       */
 /*****************************************************************************/
-#define     FSR_PARTID_BOOTLOADER           (FSR_PARTID_BML0) /* NAND bootloader */
 
 #if defined(FSR_WINCE_OAM)
 

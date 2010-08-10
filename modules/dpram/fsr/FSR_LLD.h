@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -158,7 +164,6 @@ typedef struct
             UINT32      nMLCPECycle;   /**< program, erase cycle of MLC block*/
 
             UINT8       nUID[FSR_LLD_UID_SIZE]; /**< Unique ID info. about OTP block  */
-
 } FSRDevSpec;
 
 /**
@@ -422,50 +427,47 @@ typedef struct
 /*****************************************************************************/
 /* LLD Return Values                                                         */
 /*****************************************************************************/
-#define     FSR_LLD_IOCTL_NOT_SUPPORT          FSR_RETURN_VALUE(0, 0x2, 0x0003, 0x0000)
-#define     FSR_LLD_INIT_BADBLOCK              FSR_RETURN_VALUE(0, 0x2, 0x0002, 0x0000)
-#define     FSR_LLD_INIT_GOODBLOCK             FSR_RETURN_VALUE(0, 0x2, 0x0001, 0x0000)
+#define     FSR_LLD_IOCTL_NOT_SUPPORT       FSR_RETURN_VALUE(0, 0x2, 0x0003, 0x0000)
+#define     FSR_LLD_INIT_BADBLOCK           FSR_RETURN_VALUE(0, 0x2, 0x0002, 0x0000)
+#define     FSR_LLD_INIT_GOODBLOCK          FSR_RETURN_VALUE(0, 0x2, 0x0001, 0x0000)
 
-#define     FSR_LLD_SUCCESS                    FSR_RETURN_VALUE(0, 0x2, 0x0000, 0x0000)
+#define     FSR_LLD_SUCCESS                 FSR_RETURN_VALUE(0, 0x2, 0x0000, 0x0000)
 
-#define     FSR_LLD_PREV_READ_ERROR            FSR_RETURN_VALUE(1, 0x2, 0x0001, 0x0000)
-#define     FSR_LLD_ALREADY_INITIALIZED        FSR_RETURN_VALUE(1, 0x2, 0x0003, 0x0000)
+#define     FSR_LLD_PREV_READ_ERROR         FSR_RETURN_VALUE(1, 0x2, 0x0001, 0x0000)
+#define     FSR_LLD_PREV_READ_DISTURBANCE   FSR_RETURN_VALUE(1, 0x2, 0x0002, 0x0000)
+#define     FSR_LLD_ALREADY_INITIALIZED     FSR_RETURN_VALUE(1, 0x2, 0x0003, 0x0000)
 
-#define     FSR_LLD_PREV_WRITE_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x0004, 0x0000)
-#define     FSR_LLD_PREV_ERASE_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x0005, 0x0000)
-#define     FSR_LLD_PREV_WR_PROTECT_ERROR      FSR_RETURN_VALUE(1, 0x2, 0x0006, 0x0000)
+#define     FSR_LLD_PREV_WRITE_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x0004, 0x0000)
+#define     FSR_LLD_PREV_ERASE_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x0005, 0x0000)
+#define     FSR_LLD_PREV_WR_PROTECT_ERROR   FSR_RETURN_VALUE(1, 0x2, 0x0006, 0x0000)
 
-#define     FSR_LLD_INVALID_PARAM              FSR_RETURN_VALUE(1, 0x2, 0x0007, 0x0000)
+#define     FSR_LLD_INVALID_PARAM           FSR_RETURN_VALUE(1, 0x2, 0x0007, 0x0000)
 
-#define     FSR_LLD_INIT_FAILURE               FSR_RETURN_VALUE(1, 0x2, 0x0008, 0x0000)
-#define     FSR_LLD_OPEN_FAILURE               FSR_RETURN_VALUE(1, 0x2, 0x0009, 0x0000)
+#define     FSR_LLD_INIT_FAILURE            FSR_RETURN_VALUE(1, 0x2, 0x0008, 0x0000)
+#define     FSR_LLD_OPEN_FAILURE            FSR_RETURN_VALUE(1, 0x2, 0x0009, 0x0000)
 
-#define     FSR_LLD_WR_PROTECT_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x000A, 0x0000)
-#define     FSR_LLD_NO_UNLOCKED_BLK            FSR_RETURN_VALUE(1, 0x2, 0x000B, 0x0000)
+#define     FSR_LLD_WR_PROTECT_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x000A, 0x0000)
+#define     FSR_LLD_NO_UNLOCKED_BLK         FSR_RETURN_VALUE(1, 0x2, 0x000B, 0x0000)
 
-#define     FSR_LLD_NO_RESPONSE                FSR_RETURN_VALUE(1, 0x2, 0x000C, 0x0000)
-#define     FSR_LLD_OAM_ACCESS_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x000D, 0x0000)
-#define     FSR_LLD_PAM_ACCESS_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x000E, 0x0000)
+#define     FSR_LLD_NO_RESPONSE             FSR_RETURN_VALUE(1, 0x2, 0x000C, 0x0000)
+#define     FSR_LLD_OAM_ACCESS_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x000D, 0x0000)
+#define     FSR_LLD_PAM_ACCESS_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x000E, 0x0000)
 
-#define     FSR_LLD_UNLOCKED_BLK_NOT_EXIST     FSR_RETURN_VALUE(1, 0x2, 0x000F, 0x0000)
+#define     FSR_LLD_UNLOCKED_BLK_NOT_EXIST  FSR_RETURN_VALUE(1, 0x2, 0x000F, 0x0000)
 
 /* when do PI erase or program, PI block must be unlocked                    */
-#define     FSR_LLD_PI_PROGRAM_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x0010, 0x0000)
-#define     FSR_LLD_PI_ERASE_ERROR             FSR_RETURN_VALUE(1, 0x2, 0x0011, 0x0000)
+#define     FSR_LLD_PI_PROGRAM_ERROR        FSR_RETURN_VALUE(1, 0x2, 0x0010, 0x0000)
+#define     FSR_LLD_PI_ERASE_ERROR          FSR_RETURN_VALUE(1, 0x2, 0x0011, 0x0000)
 
-#define     FSR_LLD_BLK_PROTECTION_ERROR       FSR_RETURN_VALUE(1, 0x2, 0x0012, 0x0000)
+#define     FSR_LLD_BLK_PROTECTION_ERROR    FSR_RETURN_VALUE(1, 0x2, 0x0012, 0x0000)
 
-#define     FSR_LLD_OTP_ALREADY_LOCKED         FSR_RETURN_VALUE(1, 0x2, 0x0013, 0x0000)
-#define     FSR_LLD_ALREADY_OPEN               FSR_RETURN_VALUE(1, 0X2, 0x0014, 0x0000)
-#define     FSR_LLD_MALLOC_FAIL                FSR_RETURN_VALUE(1, 0x2, 0x0015, 0x0000)
+#define     FSR_LLD_OTP_ALREADY_LOCKED      FSR_RETURN_VALUE(1, 0x2, 0x0013, 0x0000)
+#define     FSR_LLD_ALREADY_OPEN            FSR_RETURN_VALUE(1, 0X2, 0x0014, 0x0000)
+#define     FSR_LLD_MALLOC_FAIL             FSR_RETURN_VALUE(1, 0x2, 0x0015, 0x0000)
 
-#define     FSR_LLD_INVALID_BLOCK_STATE        FSR_RETURN_VALUE(1, 0x2, 0x0016, 0x0000)
+#define     FSR_LLD_INVALID_BLOCK_STATE     FSR_RETURN_VALUE(1, 0x2, 0x0016, 0x0000)
 
-#define     FSR_LLD_PI_READ_ERROR              FSR_RETURN_VALUE(1, 0x2, 0x0017, 0x0000)
-
-#define     FSR_LLD_PREV_1LV_READ_DISTURBANCE  FSR_RETURN_VALUE(1, 0x2, 0x0018, 0x0000)
-#define     FSR_LLD_PREV_2LV_READ_DISTURBANCE  FSR_RETURN_VALUE(1, 0x2, 0x0019, 0x0000)
-
+#define     FSR_LLD_PI_READ_ERROR           FSR_RETURN_VALUE(1, 0x2, 0x0017, 0x0000)
 
 /*****************************************************************************/
 /* Minor Retun Value for following major error values                        */

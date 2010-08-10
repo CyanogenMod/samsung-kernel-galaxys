@@ -744,6 +744,28 @@ dhd_op_if(dhd_if_t *ifp)
 	}
 }
 
+static volatile int deepsleep_lock = 0;
+
+void 
+dhd_os_deepsleep_block(void)
+{
+	deepsleep_lock = 1;
+}
+
+void 
+dhd_os_deepsleep_unblock(void)
+{
+	deepsleep_lock = 0;
+}
+
+void 
+dhd_os_deepsleep_wait(void)
+{
+	while(deepsleep_lock) {
+		msleep(100);
+	}
+}
+
 static int
 _dhd_sysioc_thread(void *data)
 {
@@ -753,6 +775,8 @@ _dhd_sysioc_thread(void *data)
 	DAEMONIZE("dhd_sysioc");
 
 	while (down_interruptible(&dhd->sysioc_sem) == 0) {
+		dhd_os_deepsleep_wait();
+		dhd_os_deepsleep_block();
 		for (i = 0; i < DHD_MAX_IFS; i++) {
 			if (dhd->iflist[i]) {
 				if (dhd->iflist[i]->state)
@@ -767,6 +791,7 @@ _dhd_sysioc_thread(void *data)
 				}
 			}
 		}
+		dhd_os_deepsleep_unblock();
 	}
 	complete_and_exit(&dhd->sysioc_exited, 0);
 }

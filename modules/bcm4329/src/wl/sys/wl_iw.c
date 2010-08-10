@@ -79,6 +79,7 @@ extern uint dhd_dev_reset(struct net_device *dev, uint8 flag);
 extern void dhd_dev_init_ioctl(struct net_device *dev);
 extern int dhd_deepsleep(struct net_device *dev, int flag);
 extern int dhd_set_suspend(int value, dhd_pub_t *dhd);
+extern int dhd_set_pktfilters(dhd_pub_t *dhd, int enable); /* dhd_sdio.c */
 
 uint wl_msg_level = WL_ERROR_VAL;
 
@@ -140,6 +141,7 @@ static volatile uint g_first_broadcast_scan;
 static void wl_iw_free_ss_cache(void);
 static int   wl_iw_run_ss_cache_timer(int kick_off);
 int  wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag);
+static int dev_wlc_bufvar_set(struct net_device *dev, char *name, char *buf, int len);
 #define ISCAN_STATE_IDLE   0
 #define ISCAN_STATE_SCANING 1
 
@@ -178,8 +180,9 @@ typedef enum bt_coex_status {
 	BT_DHCP_OPPORTUNITY_WINDOW,
 	BT_DHCP_FLAG_FORCE_TIMEOUT
 } coex_status_t;
-#define BT_DHCP_OPPORTUNITY_WINDOW_TIEM	2500	
-#define BT_DHCP_FLAG_FORCE_TIME				5500 	
+/* BT COEX FIX */
+#define BT_DHCP_OPPORTUNITY_WINDOW_TIEM		100
+#define BT_DHCP_FLAG_FORCE_TIME				1000
 
 typedef struct bt_info {
 	struct net_device *dev;
@@ -311,6 +314,21 @@ dev_wlc_intvar_get_reg(
 	return (error);
 }
 
+static int
+dev_wlc_intvar_set_reg(
+	struct net_device *dev,
+	char *name,
+	char *addr,
+	char * val)
+{
+	char reg_addr[8];
+
+	memset(reg_addr, 0, sizeof(reg_addr));
+	memcpy((char *)&reg_addr[0], (char *)addr, 4);
+	memcpy((char *)&reg_addr[4], (char *)val, 4);
+
+	return (dev_wlc_bufvar_set(dev, name,  (char *)&reg_addr[0], sizeof(reg_addr)));
+}
 
 
 
@@ -566,6 +584,7 @@ exit:
 	return error;
 }
 
+/* MIGRATION to Romterm 235 */
 static int
 wl_iw_set_btcoex_dhcp(
 	struct net_device *dev,
@@ -576,8 +595,7 @@ wl_iw_set_btcoex_dhcp(
 {
 	int error = 0;
 	char *p = extra;
-	uint val;
-#ifdef  CUSTOMER_HW_SAMSUNG
+#ifndef CUSTOMER_HW2
 	static int  pm = PM_FAST;
 	int  pm_local = PM_OFF;
 #endif	
@@ -586,52 +604,96 @@ wl_iw_set_btcoex_dhcp(
 	char buf_reg41va_dhcp_on[8] = { 41, 00, 00, 00, 0x33, 0x00, 0x00, 0x00 };
 	char buf_reg68va_dhcp_on[8] = { 68, 00, 00, 00, 0x90, 0x01, 0x00, 0x00 };
 
-	char buf_reg66val_defualt[8] = { 66, 00, 00, 00, 0x88, 0x13, 0x00, 0x00 };
-	char buf_reg41val_defualt[8] = { 41, 00, 00, 00, 0x13, 0x00, 0x00, 0x00 };
-	char buf_reg68val_defualt[8] = { 68, 00, 00, 00, 0x14, 0x00, 0x00, 0x00 };
+	uint32 regaddr;
+	static uint32 saved_reg66;
+	static uint32 saved_reg41;
+	static uint32 saved_reg68;
+	static bool saved_status = FALSE;
 
 	char buf_flag7_default[8] =   { 7, 00, 00, 00, 0x0, 0x00, 0x00, 0x00};
+#ifndef CUSTOMER_HW2
+	uint32 temp1, temp2, temp3;
+#endif 
 
 	
 	strncpy((char *)&powermode_val, extra + strlen("POWERMODE") +1, 1);
 
 	
-	dev_wlc_intvar_get_reg(dev, "btc_params", 68,  &val);
-
 	if (strnicmp((char *)&powermode_val, "1", strlen("1")) == 0) {
+
+		wl_iw_t *iw = *(wl_iw_t **)netdev_priv(dev);
 
 		WL_TRACE(("%s: DHCP session starts\n", __FUNCTION__));
 
-#ifdef  CUSTOMER_HW_SAMSUNG
+		/* disable packet filtering */
+		dhd_set_pktfilters(iw->pub, 0);
 		
-		dev_wlc_ioctl(dev, WLC_GET_PM, &pm, sizeof(pm));
-		
-		dev_wlc_ioctl(dev, WLC_SET_PM, &pm_local, sizeof(pm_local));
-#endif 
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg66va_dhcp_on[0], sizeof(buf_reg66va_dhcp_on));
-		
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg41va_dhcp_on[0], sizeof(buf_reg41va_dhcp_on));
-		
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg68va_dhcp_on[0], sizeof(buf_reg68va_dhcp_on));
+		if ((saved_status == FALSE) &&
+#ifndef CUSTOMER_HW2
+			(!dev_wlc_ioctl(dev, WLC_GET_PM, &pm, sizeof(pm))) &&
+#endif
+			(!dev_wlc_intvar_get_reg(dev, "btc_params", 66,  &saved_reg66)) &&
+			(!dev_wlc_intvar_get_reg(dev, "btc_params", 41,  &saved_reg41)) &&
+			(!dev_wlc_intvar_get_reg(dev, "btc_params", 68,  &saved_reg68)))   {
+				saved_status = TRUE;
+				WL_TRACE(("Saved 0x%x 0x%x 0x%x\n", \
+					saved_reg66, saved_reg41, saved_reg68));
 
 		
+#ifndef CUSTOMER_HW2
+		dev_wlc_ioctl(dev, WLC_SET_PM, &pm_local, sizeof(pm_local));
+#endif 
+
+				
+		dev_wlc_bufvar_set(dev, "btc_params", \
+					(char *)&buf_reg66va_dhcp_on[0], \
+						 sizeof(buf_reg66va_dhcp_on));
+		
+		dev_wlc_bufvar_set(dev, "btc_params", \
+					(char *)&buf_reg41va_dhcp_on[0], \
+						 sizeof(buf_reg41va_dhcp_on));
+		
+		dev_wlc_bufvar_set(dev, "btc_params", \
+					(char *)&buf_reg68va_dhcp_on[0], \
+						 sizeof(buf_reg68va_dhcp_on));
+		
+#ifndef CUSTOMER_HW2
+				if ( ((!dev_wlc_intvar_get_reg(dev, "btc_params", 12, &temp1)) &&
+					(!dev_wlc_intvar_get_reg(dev, "btc_params", 13, &temp2)) ) ||
+					(!dev_wlc_intvar_get_reg(dev, "btc_params", 27, &temp3)) )
+				{
+					if ( ((temp1 != 0) && (temp2 != 0)) ||
+						(temp3 & 0xf) == 4 )
+					{
+#endif
 		g_bt->bt_state = BT_DHCP_START;
 		g_bt->timer_on = 1;
 		mod_timer(&g_bt->timer, g_bt->timer.expires);
-		WL_TRACE(("%s enable BT DHCP Timer\n", __FUNCTION__));
-
+						WL_TRACE(("%s enable BT DHCP Timer\n", \
+							__FUNCTION__));
+#ifndef CUSTOMER_HW2
+					}
+				}
+#endif
+		}
+		else if (saved_status == TRUE) {
+			WL_ERROR(("%s was called w/o DHCP OFF. Continue\n", __FUNCTION__));
+		}
 	}
 	else if (strnicmp((char *)&powermode_val, "0", strlen("0")) == 0) {
 
+		wl_iw_t *iw = *(wl_iw_t **)netdev_priv(dev);
+
 		WL_TRACE(("%s: DHCP session done\n", __FUNCTION__));
 
-#ifdef  CUSTOMER_HW_SAMSUNG
+		/* re-enable packet filtering according to early suspend status */
+		dhd_set_pktfilters(iw->pub, 1);
+
 		
+#ifndef CUSTOMER_HW2
 		dev_wlc_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm));
 #endif 
+		
 		
 		WL_TRACE(("%s disable BT DHCP Timer\n", __FUNCTION__));
 		if (g_bt->timer_on) {
@@ -644,14 +706,19 @@ wl_iw_set_btcoex_dhcp(
 				(char *)&buf_flag7_default[0], sizeof(buf_flag7_default));
 
 		
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg66val_defualt[0], sizeof(buf_reg66val_defualt));
+		if (saved_status) {
+			regaddr = 66;
+			dev_wlc_intvar_set_reg(dev, "btc_params", \
+				(char *)&regaddr, (char *)&saved_reg66);
+			regaddr = 41;
+			dev_wlc_intvar_set_reg(dev, "btc_params", \
+				(char *)&regaddr, (char *)&saved_reg41);
+			regaddr = 68;
+			dev_wlc_intvar_set_reg(dev, "btc_params", \
+				(char *)&regaddr, (char *)&saved_reg68);
+		}
+		saved_status = FALSE;
 		
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg41val_defualt[0], sizeof(buf_reg41val_defualt));
-		
-		dev_wlc_bufvar_set(dev, "btc_params", \
-				   (char *)&buf_reg68val_defualt[0], sizeof(buf_reg68val_defualt));
 	}
 	else {
 		WL_ERROR(("Unkwown yet power setting, ignored\n"));
@@ -840,10 +907,10 @@ wl_iw_control_wl_off(
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
 #endif
 	if (dev == 0) {
-		WL_ERROR(("%s: dev is NULL. Skipping sending STOP\n", __FUNCTION__));
-	} else {
+			WL_ERROR(("%s: dev is NULL. Skipping sending STOP\n", __FUNCTION__));
+		} else {
 		wl_iw_send_priv_event(dev, "STOP");
-	}
+}
 
 	MUTEX_UNLOCK(iw->pub);
 
@@ -4065,8 +4132,8 @@ wl_iw_set_priv(
 
 		if (g_onoff == G_WLAN_SET_OFF) {
 			if (strnicmp(extra, "START", strlen("START")) != 0) {
-					WL_ERROR(("%s First IOCTL after stop is NOT START \n", \
-								__FUNCTION__));
+					WL_ERROR(("%s First IOCTL '%s' after stop is NOT START \n", \
+								__FUNCTION__, extra));
 				WAKE_UNLOCK(iw->pub, WAKE_LOCK_PRIV);
 				WAKE_LOCK_DESTROY(iw->pub, WAKE_LOCK_PRIV);
 				kfree(extra);
@@ -4796,6 +4863,8 @@ wl_iw_bt_timerfunc(ulong data)
 static int
 _bt_dhcp_sysioc_thread(void *data)
 {
+	/* BT COEX FIX */
+	int retry_time = 0;
 	DAEMONIZE("dhcp_sysioc");
 
 	while (down_interruptible(&g_bt->bt_sem) == 0) {
@@ -4806,6 +4875,8 @@ _bt_dhcp_sysioc_thread(void *data)
 
 		switch (g_bt->bt_state) {
 			case BT_DHCP_START:
+				/* BT COEX FIX */
+				retry_time = 0;
 				
 				g_bt->bt_state = BT_DHCP_OPPORTUNITY_WINDOW;
 				mod_timer(&g_bt->timer, jiffies + \
@@ -4827,8 +4898,16 @@ _bt_dhcp_sysioc_thread(void *data)
 						__FUNCTION__, BT_DHCP_FLAG_FORCE_TIME));
 				
 				if (g_bt->dev)  wl_iw_bt_flag_set(g_bt->dev, FALSE);
+				/* BT COEX FIX */
+				if (retry_time++ < 30) {
+					g_bt->bt_state = BT_DHCP_OPPORTUNITY_WINDOW;
+					mod_timer(&g_bt->timer, jiffies + BT_DHCP_OPPORTUNITY_WINDOW_TIEM*HZ/1000);
+					g_bt->timer_on = 1;
+				} else {
+					WL_ERROR(("dhcp retry 30 times, give up !!\n"));
 				g_bt->bt_state = BT_DHCP_IDLE;
 				g_bt->timer_on = 0;
+				}
 				break;
 			default:
 				WL_ERROR(("%s error g_status=%d !!!\n", __FUNCTION__, \

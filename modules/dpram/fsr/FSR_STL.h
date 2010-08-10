@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -38,6 +44,7 @@
 /* Common Constant definitions                                               */
 /*****************************************************************************/
 #define FSR_MAX_STL_DFRG_GROUP              (9)
+#define FSR_MAX_STL_PARTITIONS              (FSR_PARTID_STL7 - FSR_PARTID_STL0 + 1)
 
 /*****************************************************************************/
 /* FSR_STL Format Options                                                    */
@@ -45,10 +52,7 @@
 #define FSR_STL_FORMAT_NONE                 (1 << 0)
 #define FSR_STL_FORMAT_REMEMBER_ECNT        (1 << 1)
 #define FSR_STL_FORMAT_USE_ECNT             (1 << 2)
-#define FSR_STL_FORMAT_HOT_SPOT             (1 << 3)    /* \deprecated{not supported, but for backward-compatability} */
-#define FSR_STL_FORMAT_SET_NUM_INITFREE     (1 << 4)    /* Set the number of initial free units */
-#define FSR_STL_FORMAT_SET_MIN_META         (1 << 5)    /* Set the number of minimum meta units */
-#define FSR_STL_FORMAT_SECURE               (1 << 6)
+#define FSR_STL_FORMAT_HOT_SPOT             (1 << 3)    /* this wil be supported */
 
 /*****************************************************************************/
 /* FSR_STL Flags for Read/Write/Delete                                       */
@@ -59,8 +63,8 @@
 /* for FSR_STL_Write */
 #define FSR_STL_FLAG_WRITE_HOT_DATA         (1 << 0)
 #define FSR_STL_FLAG_WRITE_COLD_DATA        (1 << 1)
-#define FSR_STL_FLAG_WRITE_NO_LSB_BACKUP    (1 << 2)    /* Not supported yet */
-#define FSR_STL_FLAG_WRITE_NO_CONFIRM       (1 << 3)    /* Not supported yet */
+#define FSR_STL_FLAG_WRITE_NO_LSB_BACKUP    (1 << 2)    /* this wil be supported */
+#define FSR_STL_FLAG_WRITE_NO_CONFIRM       (1 << 3)    /* this wil be supported */
 
 /* for FSR_STL_Delete */
 #define FSR_STL_FLAG_DELETE_SECURE          (1 << 4)
@@ -255,7 +259,7 @@
 /*                  (VOID *) &nStlPartFlag, sizeof(nStlPartFlag), NULL, 0,   */
 /*                  NULL);                                                   */
 /*****************************************************************************/
-#define FSR_STL_IOCTL_CHANGE_PART_ATTR      FSR_IOCTL_CODE(FSR_MODULE_STL, 8,   \
+#define FSR_STL_IOCTL_CHANGE_PART_ATTR       FSR_IOCTL_CODE(FSR_MODULE_STL, 8,   \
                                                         FSR_METHOD_IN_DIRECT,   \
                                                         FSR_WRITE_ACCESS)
 
@@ -278,153 +282,96 @@
 /*  FSR_BML_LoadPIEntry(nVol, nPartID, &n1stVpn, &nPgsPerUnit, &stPartEntry);*/
 /*  n1stVun = stPartEntry.n1stVun;                                           */
 /*                                                                           */
-/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_STATS_RESET,                */
-/*                   NULL, 0, NULL, 0, &nBytesReturned);                     */
+/*  nErr = FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_STATS_RESET, NULL,   */
+/*                         0, NULL, 0, &nBytesReturned);                     */
 /*                                                                           */
 /*  // Some Stl Operation                                                    */
 /*                                                                           */
-/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_STATS_GET,                  */
-/*                   NULL, 0, &stStlStats, sizeof(stStlStats),               */
+/*  nErr = FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_STATS_GET, NULL,     */
+/*                         0, &stStlStats, sizeof(stStlStats),               */
 /*                         &nBytesReturned);                                 */
+/*                                                                           */
 /*****************************************************************************/
-#define FSR_STL_IOCTL_RESET_STATS           FSR_IOCTL_CODE(FSR_MODULE_STL, 9,   \
+#define FSR_STL_IOCTL_RESET_STATS            FSR_IOCTL_CODE(FSR_MODULE_STL, 9,  \
                                                         FSR_METHOD_OUT_DIRECT,  \
                                                         FSR_READ_ACCESS)
 
-#define FSR_STL_IOCTL_GET_STATS             FSR_IOCTL_CODE(FSR_MODULE_STL, 10,  \
+#define FSR_STL_IOCTL_GET_STATS              FSR_IOCTL_CODE(FSR_MODULE_STL, 10, \
                                                         FSR_METHOD_OUT_DIRECT,  \
                                                         FSR_READ_ACCESS)
 
 /*****************************************************************************/
 /*  UINT32       nVol;                                                       */
 /*  UINT32       nPartID;                                                    */
-/*  UINT32       naWBInfo[2];                                                */
-/*  UINT32       nTotalBlksOfWB;                                             */
-/*  UINT32       nUsedBlksOfWB;                                              */
-/*  UINT32       nBytesReturned;                                             */
+/*  UINT32       nFreeRatio;                                                 */
 /*                                                                           */
 /*  nVol         = 0;                                                        */
 /*  nPartID      = FSR_PARTID_STL0;                                          */
+/*  nFreeRatio   = 10;                                                       */
 /*                                                                           */
-/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_GET_WB_INFO                 */
-/*                  NULL, 0, (VOID *) &nWBInfo[0], sizeof(UINT32) * 2,       */
-/*                  &nBytesReturned);                                        */
-/*                                                                           */
-/*  nTotalBlksOfWB = naWBInfo[0];                                            */
-/*  nUsedBlksOfWB  = naWBInfo[1];                                            */
-/*                                                                           */
-/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_FLUSH_WB                    */
-/*                  (VOID *) &nUsedBlksOfWB, sizeof(UINT32), NULL, 0,        */
-/*                  &nBytesReturned);                                        */
-/*****************************************************************************/
-#define FSR_STL_IOCTL_GET_WB_INFO           FSR_IOCTL_CODE(FSR_MODULE_STL, 11,  \
-                                                        FSR_METHOD_IN_DIRECT,   \
-                                                        FSR_WRITE_ACCESS)
-
-#define FSR_STL_IOCTL_FLUSH_WB              FSR_IOCTL_CODE(FSR_MODULE_STL, 12,  \
-                                                        FSR_METHOD_IN_DIRECT,   \
-                                                        FSR_WRITE_ACCESS)
-
-/*****************************************************************************/
-/*  UINT32       nVol;                                                       */
-/*  UINT32       nPartID;                                                    */
-/*  UINT32       nNumOfBlk;                                                  */
-/*                                                                           */
-/*  nVol         = 0;                                                        */
-/*  nPartID      = FSR_PARTID_STL0;                                          */
-/*  nNumOfBlk    = 10;                                                       */
-/*                                                                           */
-/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_RUN_ER,                     */
-/*                  (VOID *) &nNumOfBlk, sizeof(nNumOfBlk), NULL, 0,         */
+/*  FSR_STL_IOCtl  (nVol, nPartID, FSR_STL_IOCTL_FLUSH_WB,                   */
+/*                  (VOID *) &nFreeRatio, sizeof(nFreeRatio), NULL, 0,       */
 /*                  NULL);                                                   */
 /*****************************************************************************/
-#define FSR_STL_IOCTL_RUN_ER                FSR_IOCTL_CODE(FSR_MODULE_STL, 13,  \
+#define FSR_STL_IOCTL_FLUSH_WB               FSR_IOCTL_CODE(FSR_MODULE_STL, 11, \
                                                         FSR_METHOD_IN_DIRECT,   \
                                                         FSR_WRITE_ACCESS)
 
-/*****************************************************************************/
-/* STL Data Structures                                                       */
-/*****************************************************************************/
-
 /**
- * @brief       Data structure for the parameter of FSR_STL_Format
+ * @brief       data structure of the parameter of FSR_STL_Format
  */
 typedef struct
 {
-    UINT32      nOpt;               /**< FSR_STL_FORMAT_NONE                                /
-                                         FSR_STL_FORMAT_REMEMBER_ECNT                       /
-                                         FSR_STL_FORMAT_USE_ECNT                            /
-                                         FSR_STL_FORMAT_SET_NUM_INITFREE                    /
-                                         FSR_STL_FORMAT_SECURE                              */
-
-    UINT32      nStartSctsOfHot;    /**< \deprecated{not supported, but for backward-compatability} */
-    UINT32      nNumOfSctsOfHot;    /**< \deprecated{not supported, but for backward-compatability} */
-
-    UINT32      nAvgECnt;           /**< If nOpt has FSR_STL_FORMAT_REMEMBER_ECNT,
-                                         this value is used when we cannot retrieve the original erase count */
-
-    UINT32      nNumOfECnt;         /**< If nOpt has FSR_STL_FORMAT_USE_ECNT,
-                                         this value is used for the array size of erase count */
-
-    UINT32     *pnECnt;             /**< If nOpt has FSR_STL_FORMAT_USE_ECNT,
-                                         this value is used to set erase count of each unit  */
-
-    UINT16      nNumOfInitFreeUnits;/**< If nOpt has FSR_STL_FORMAT_SET_NUM_INITFREE,
-                                         this value is used for the number of initial free units, 
-                                         which is the same as reserved unit in XSR          */
-
-    UINT16      nNumOfMinMetaUnits; /**< If nOpt has FSR_STL_FORMAT_SET_MIN_META,
-                                         this value is used for the minimum number of meta units */
+    UINT32      nOpt;               /**< FSR_STL_FORMAT_NONE          /
+                                         FSR_STL_FORMAT_REMEMBER_ECNT /
+                                         FSR_STL_FORMAT_USE_ECNT      /
+                                         FSR_STL_FORMAT_HOT_SPOT               */
+    UINT32      nStartSctsOfHot;    /**< If nOpt has FSR_STL_FORMAT_HOT_SPOT,
+                                         start sector number of Hot spot area  */
+    UINT32      nNumOfSctsOfHot;    /**< If nOpt has FSR_STL_FORMAT_HOT_SPOT,
+                                         the number of sectors of Hot spot area*/
+    UINT32      nAvgECnt;           /**< If nOpt has FSR_STL_FORMAT_REMEMBER_ECNT
+                                         we use this value if we cannot retrieve the original erase count */
+    UINT32      nNumOfECnt;         /**< If nOpt has FSR_STL_FORMAT_USE_ECNT
+                                         The array size of erase count          */
+    UINT32     *pnECnt;             /**< If nOpt has FSR_STL_FORMAT_USE_ECNT
+                                         we use this value to set erase count of each unit */
 } FSRStlFmtInfo;
 
 /**
- * @brief       Data structure for the parameter of FSR_STL_Open
+ * @brief
  */
 typedef struct
 {
-    UINT32  nLogSctsPerPage;                /**< The number of sectors per a page           */
-    UINT32  nLogSctsPerUnit;                /**< The number of sectors per a unit           */
-    UINT32  nTotalLogScts;                  /**< The number of total logical sectors        */
-    UINT32  nTotalLogUnits;                 /**< The number of total logical units          */
-} FSRStlInfo;
+    UINT32          nNumOfUnits;
+    UINT32          nSctsPerUnit;
+    UINT32          nECnt;
+    UINT32          nSTLRdScts;
+    UINT32          nSTLWrScts;
+    UINT32          nSTLDelScts;
+    
+    UINT32          nCompactionCnt;         /**< compaction count                   */
+    UINT32          nActCompactCnt;         /**< active compaction count            */
+    UINT32          nTotalLogBlkCnt;        /**< total allocated log block count    */
+    UINT32          nTotalLogPgmCnt;        /**< total log block program count      */
+    UINT32          nCtxPgmCnt;             /**< total meta page program count      */
+} FSRStlStats;
 
 /**
- * @brief       Data structure for the parameter of FSR_STL_IOCTL_GET_STATS
+ * @brief       data structure of the parameter of FSR_STL_Open
  */
 typedef struct
-{    
-    UINT32          nZoneRdPgs;             /**< Zone read pages                            */
-    UINT32          nZoneWrPgs;             /**< Zone write pages                           */
+{
+    UINT32  nLogSctsPerPage; /**< Output : The number of sectors per a page    */
+    UINT32  nLogSctsPerUnit; /**< Output : The number of sectors per a unit    */
+    UINT32  nTotalLogScts;   /**< Output : The number of total logical sectors */
+    UINT32  nTotalLogUnits;  /**< Output : The number of total logical units   */
+} FSRStlInfo;
 
-    UINT32          nWBRdPgs;               /**< WB read pages                              */
-    UINT32          nWBWrPgs;               /**< WB write pages                             */
-
-    UINT32          nLogECnt;               /**< Log block erase count                      */
-    UINT32          nMetaECnt;              /**< Meta block erase count                     */
-    UINT32          nWBECnt;                /**< WB block erase count                       */
-
-    UINT32          nFreeLogCnt;            /**< Free log count (in log reclaim)            */
-    UINT32          nCompactLogCnt;         /**< Compact log count (in log reclaim)         */
-    UINT32          nMergeLogCnt;           /**< Merge log count (in log reclaim)           */
-    UINT32          nRefreshLogCnt;         /**< Refresh log count (in log reclaim)         */
-    UINT32          nReclaimMetaCnt;        /**< Meta reclaim count                         */ 
-
-    UINT32          nLogPgmPgs;             /**< Normal log program pages                   */
-    UINT32          nLogPgmPgsByReclaim;    /**< Log program pages by log reclaim           */
-    UINT32          nLogPgmPgsByWearLevel;  /**< Log program pages by wear-leveling         */
-    UINT32          nLogPgmPgsByWBFlush;    /**< Log program pages by WB flush              */
-
-    UINT32          nCtxPgmPgs;             /**< Normal meta page program count             */
-    UINT32          nCtxPgmPgsByReclaim;    /**< Meta program pages by meta reclaim         */
-
-    UINT32          nLocalWearLevelCnt;     /**< Local wearleveling count                   */
-    UINT32          nGlobalWearLevelCnt;    /**< Global wearleveling count                  */
-    UINT32          nMetaWearLevelCnt;      /**< Meta wearleveling count                    */
-} FSRStlStats;
 
 #if defined(FSR_STL_FOR_PRE_PROGRAMMING)
 /**
- * @brief       Data structure for the parameter of FSRStlDfrg
+ * @brief       data structure of the parameter for FSRStlDfrg
  */
 typedef struct
 {
@@ -433,7 +380,7 @@ typedef struct
 } FSRStlUnitGrp;
 
 /**
- * @brief       Data structure for the parameter of FSR_STL_Defragment
+ * @brief       data structure of the parameter of FSR_STL_Defragment
  */
 typedef struct
 {

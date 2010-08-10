@@ -160,6 +160,7 @@
 #define IRQ_INT_ONEDRAM_AP_N		IRQ_EINT11
 #define IRQ_PHONE_ACTIVE			IRQ_EINT15
 
+#define ONEDRAM_RFS_MINOR			233
 /***************************************************************************/
 static DECLARE_WAIT_QUEUE_HEAD(dpram_wait);
 
@@ -219,7 +220,7 @@ extern unsigned int HWREV;
  */
 static unsigned char cpdump_debug_file_name[DPRAM_ERR_MSG_LEN];
 
-static int kernel_sec_dump_cp_handle1(vod);
+static int kernel_sec_dump_cp_handle1(void);
 static int kernel_sec_dump_cp_handle2(void);
 
 static int kernel_sec_dump_cp_config_uploadmode(void);
@@ -351,6 +352,7 @@ extern int hw_version_check(void);
 
 static DECLARE_MUTEX(write_mutex);
 struct wake_lock dpram_wake_lock;
+struct wake_lock phone_active_wake_lock;
 
 #ifdef CONFIG_EVENT_LOGGING
 static inline EVENT_HEADER *getPayloadHeader(int flag, int size)
@@ -394,10 +396,15 @@ static inline void dpram_event_logging(int direction, void *src, int size)
 
 void write_hwrevision(unsigned long reg)
 {
+#if 1 // Kepler,Supersonic
+				*((unsigned char *)(DPRAM_VBASE + reg)) = (unsigned char)HWREV;
+
+#else
 		if(HWREV == 0x8)
 				*((unsigned char *)(DPRAM_VBASE + reg)) = 0x1;
 		else
 				*((unsigned char *)(DPRAM_VBASE + reg)) = 0x0;
+#endif
 }
 
 /* tty related functions. */
@@ -539,7 +546,7 @@ static void print_debug_current_time(void)
 	/* set current time */
 	rtc_time_to_tm(time.tv_sec, &tm);
 
-	printk(KERN_INFO "Kernel Current Time info - %02d%02d%02d%02d%02d.%ld \n", tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, time.tv_usec);
+	printk(KERN_INFO"Kernel Current Time info - %02d%02d%02d%02d%02d.%ld \n", tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, time.tv_usec);
 
 }
 #endif
@@ -702,45 +709,45 @@ static int dpram_write(dpram_device_t *device,
 		return -EAGAIN;
 	}
 
-	READ_FROM_DPRAM(&head, device->out_head_addr, sizeof(head));
-	READ_FROM_DPRAM(&tail, device->out_tail_addr, sizeof(tail));
+		READ_FROM_DPRAM(&head, device->out_head_addr, sizeof(head));
+		READ_FROM_DPRAM(&tail, device->out_tail_addr, sizeof(tail));
 
-	if(head < tail)
-		freesize = tail - head - 1;
-	else
-		freesize = device->out_buff_size - head + tail -1;
+		if(head < tail)
+			freesize = tail - head - 1;
+		else
+			freesize = device->out_buff_size - head + tail -1;
 
-	if(freesize >= len){
+		if(freesize >= len){
 
-		next_head = head + len;
+			next_head = head + len;
 
-		if(next_head < device->out_buff_size) {
-			size = len;
-			WRITE_TO_DPRAM(device->out_buff_addr + head, buf, size);
-			retval = size;
-		}
-		else {
-			next_head -= device->out_buff_size;
+			if(next_head < device->out_buff_size) {
+				size = len;
+				WRITE_TO_DPRAM(device->out_buff_addr + head, buf, size);
+				retval = size;
+			}
+			else {
+				next_head -= device->out_buff_size;
 
-			size = device->out_buff_size - head;
-			WRITE_TO_DPRAM(device->out_buff_addr + head, buf, size);
-			retval = size;
+				size = device->out_buff_size - head;
+				WRITE_TO_DPRAM(device->out_buff_addr + head, buf, size);
+				retval = size;
 
-			size = next_head;
-			WRITE_TO_DPRAM(device->out_buff_addr, buf + retval, size);
-			retval += size;
-		}
+				size = next_head;
+				WRITE_TO_DPRAM(device->out_buff_addr, buf + retval, size);
+				retval += size;
+			}
 
-		head = next_head;
+			head = next_head;
 
-		WRITE_TO_DPRAM(device->out_head_addr, &head, sizeof(head));
+			WRITE_TO_DPRAM(device->out_head_addr, &head, sizeof(head));
 				
-	}
+		}
 	irq_mask = INT_MASK_VALID | device->mask_send;
-
-       	onedram_release_lock(__func__);
-       	send_interrupt_to_phone_with_semaphore(irq_mask);
-
+		
+        	onedram_release_lock(__func__);
+        	send_interrupt_to_phone_with_semaphore(irq_mask);
+		
 	if (retval <= 0) {
 		printk("dpram_write : not enough space Fail (-1): freesize[%d],len[%d]\n",freesize, len);
 		device->out_head_saved = head;
@@ -788,12 +795,31 @@ static int dpram_read(dpram_device_t *device, const u16 non_cmd)
 	int size = 0;
 	u32 head, tail, up_tail;
 
+	static int retry_count_for_reboot = 0;
+
 #ifdef	NO_TTY_DPRAM
 	struct tty_struct *tty = device->serial.tty;
 #endif
 	if(!onedram_get_semaphore_dpram(__func__)) 
 	{
 		printk(KERN_DEBUG "%s%04d : %d \n", __func__, __LINE__, *onedram_sem);
+
+		if(phone_sync == 0){
+
+			printk("%s: checking for reset! -- retry_count = %d\n", __func__, retry_count_for_reboot);
+
+			if(retry_count_for_reboot < 100){
+				retry_count_for_reboot++;
+				return -EAGAIN;
+			}
+			printk("%s: waiting for reset!\n", __func__);
+			
+			kernel_sec_clear_upload_magic_number();
+			kernel_sec_hw_reset(TRUE);
+			while(1);
+		}
+		retry_count_for_reboot = 0;
+		
 		return -EAGAIN;
 	}
 
@@ -1052,7 +1078,7 @@ static int onedram_get_semaphore_dpram(const char *func)
 		udelay(100);
 	}
 
-	dprintk("Failed to get a Semaphore (%s) sem:%d, phone status: %s\n", func, *onedram_sem,	(dpram_phone_getstatus() ? "ACTIVE" : "INACTIVE"));
+	printk("Failed to get a Semaphore (%s) sem:%d, phone status: %s\n", func, *onedram_sem,	(dpram_phone_getstatus() ? "ACTIVE" : "INACTIVE"));
 
 	return 0;
 }
@@ -1100,13 +1126,13 @@ static int return_onedram_semaphore(const char* func)
 		del_timer(&request_semaphore_timer);
 
 		dprintk("%s %d\n", __func__, __LINE__);
-		return 1;
+			return 1;
 	}else {
 		mod_timer(&request_semaphore_timer,  jiffies + HZ/2);
 		requested_semaphore++;
 		dprintk("%s %d\n", __func__, __LINE__);
 
-		return 0;
+	return 0;
 	}
 }
 
@@ -1115,20 +1141,20 @@ static int onedram_lock_with_semaphore(const char* func)
 	int lock_value;
 
 	if(!(lock_value = atomic_inc_return(&onedram_lock)))
-		dprintk("(lock) fail to locking onedram access. %d\n", func, lock_value);
+		printk("(lock) fail to locking onedram access. %d\n", func, lock_value);
 
 	if(lock_value != 1)
-		dprintk("(lock) lock_value: %d\n", func, lock_value);
+		printk("(lock) lock_value: %d\n", func, lock_value);
 
 	if(*onedram_sem == 0x1) 
 		return 0;	
 	else {
-		dprintk("(lock) failed.. no sem\n", func);
+		printk("(lock) failed.. no sem\n", func);
 		if((lock_value = atomic_dec_return(&onedram_lock)) < 0)
-			dprintk("(lock) fail to unlocking onedram access. %d\n", func, lock_value);
+			printk("(lock) fail to unlocking onedram access. %d\n", func, lock_value);
 
 		if(lock_value != 0)
-			dprintk("(lock) lock_value: %d\n", func, lock_value);
+			printk("(lock) lock_value: %d\n", func, lock_value);
 		return -1;
 	}
 }
@@ -2684,7 +2710,7 @@ static void cmd_error_display_handler(void)
 	memset((void *)buf, 0, sizeof (buf));
 
 	if(kernel_sec_get_debug_level() != KERNEL_SEC_DEBUG_LEVEL_LOW) {
-		u32 mailbox_AB=0x00;
+	u32 mailbox_AB=0x00;
 
 		buf[0] = '1';
 		buf[1] = ' ';
@@ -2700,22 +2726,35 @@ static void cmd_error_display_handler(void)
 					kernel_sec_dump_cp_handle1();			
 				}
 			}	
-		}else{
+
+			wake_lock(&phone_active_wake_lock);
 			memcpy(buf+2, "Modem Error Fatal", sizeof("Modem Error Fatal"));
+			mdelay(100);
+			wake_lock_timeout(&phone_active_wake_lock, HZ * 30);
+			
+		}else{
+			wake_lock(&phone_active_wake_lock);
+			memcpy(buf+2, "Modem Error Fatal", sizeof("Modem Error Fatal"));
+			mdelay(100);
+			wake_lock_timeout(&phone_active_wake_lock, HZ * 30);
 		}
 	} else {
+		
+		wake_lock(&phone_active_wake_lock);
 		memcpy((void *)buf, "8 $PHONE-OFF", sizeof("8 $PHONE-OFF"));
+		mdelay(100);
+		wake_lock_timeout(&phone_active_wake_lock, HZ * 30);
 	}
 
-	printk("[PHONE ERROR] ->> %s\n", buf);
+		printk("[PHONE ERROR] ->> %s\n", buf);
 
-	local_irq_save(flags);
-	memcpy(dpram_err_buf, buf, DPRAM_ERR_MSG_LEN);
-	dpram_err_len = 64;
-	local_irq_restore(flags);
+		local_irq_save(flags);
+		memcpy(dpram_err_buf, buf, DPRAM_ERR_MSG_LEN);
+		dpram_err_len = 64;
+		local_irq_restore(flags);
 
-	wake_up_interruptible(&dpram_err_wait_q);
-	kill_fasync(&dpram_err_async_q, SIGIO, POLL_IN);
+		wake_up_interruptible(&dpram_err_wait_q);
+		kill_fasync(&dpram_err_async_q, SIGIO, POLL_IN);
 }
 
 static void cmd_phone_start_handler(void)
@@ -3019,9 +3058,9 @@ static irqreturn_t phone_active_irq_handler(int irq, void *dev_id)
 {
 
 	if (phone_sync == 0)	return IRQ_HANDLED;
-	
+
 	printk("%s %d PHONE %s\n", __func__, __LINE__, (dpram_phone_getstatus() ? "ACTIVE" : "INACTIVE"));
-	
+   
 	if(phone_power_off_sequence == 0x1)
 		cmd_phone_reset_handler();
 	else
@@ -3048,8 +3087,8 @@ static int kernel_sec_dump_cp_handle1(void)
 	}
 
 	printk(" +--------------------------------------------+\n");
-	printk(" - CP Dump Cause - \n");
-	printk(" - [File Name  Line ] %s \n",cpdump_debug_file_name);
+    printk(" - CP Dump Cause - \n");
+    printk(" - [File Name  Line ] %s \n",cpdump_debug_file_name);
 	printk(" +--------------------------------------------+\n");
 
 	printk("[kernel_sec_dump_cp_handle1] : CP Crashed, restart and collect Dump !\n");
@@ -3062,16 +3101,16 @@ static int kernel_sec_dump_cp_handle1(void)
 
 static int kernel_sec_dump_cp_handle2(void)
 {
-    t_kernel_sec_mmu_info mmu_info;
-
-    printk("[kernel_sec_dump_cp_handle2] : Configure to restart AP and collect dump on restart...\n");
+ 	t_kernel_sec_mmu_info mmu_info;    
+    
+	printk("[kernel_sec_dump_cp_handle2] : Configure to restart AP and collect dump on restart...\n");
         kernel_sec_set_cause_strptr(cpdump_debug_file_name, sizeof(cpdump_debug_file_name));
-    kernel_sec_set_upload_magic_number();
-    kernel_sec_get_mmu_reg_dump(&mmu_info);
-    kernel_sec_set_upload_cause(UPLOAD_CAUSE_CP_ERROR_FATAL);
-    kernel_sec_hw_reset(false);
-
-    return 0;
+	kernel_sec_set_upload_magic_number();
+	kernel_sec_get_mmu_reg_dump(&mmu_info);
+	kernel_sec_set_upload_cause(UPLOAD_CAUSE_CP_ERROR_FATAL);
+	kernel_sec_hw_reset(false);
+    
+	return 0;
 }
 
 static int kernel_sec_dump_cp_config_uploadmode(void)
@@ -3177,7 +3216,7 @@ if (IS_ERR(dpram_class))
 
 static void request_semaphore_timer_func(unsigned long aulong)
 {
-	if( requested_semaphore > 0 ) {	// cp couln't get semaphore within 500ms from last request
+	if ( requested_semaphore > 0 ) {	// cp couln't get semaphore within 500ms from last request
 		printk(KERN_DEBUG "%s%02d rs=%d lock=%d\n"
 				,__func__, __LINE__, 
 				requested_semaphore, atomic_read(&onedram_lock));
@@ -3484,7 +3523,7 @@ static struct file_operations onedram_rfs_fops = {
 
 
 static struct miscdevice onedram_rfs_device = {
-	.minor = MISC_DYNAMIC_MINOR,
+	.minor = ONEDRAM_RFS_MINOR,
 	.name = "onedram_rfs",
 	.fops = &onedram_rfs_fops,
 };
@@ -3587,12 +3626,14 @@ static struct platform_driver platform_dpram_driver = {
 static int __init dpram_init(void)
 {
 	wake_lock_init(&dpram_wake_lock, WAKE_LOCK_SUSPEND, "DPRAM");
+	wake_lock_init(&phone_active_wake_lock, WAKE_LOCK_SUSPEND, "Phone_Active");
 	return platform_driver_register(&platform_dpram_driver);
 }
 
 static void __exit dpram_exit(void)
 {
 	wake_lock_destroy(&dpram_wake_lock);
+	wake_lock_destroy(&phone_active_wake_lock);
 	platform_driver_unregister(&platform_dpram_driver);
 }
 

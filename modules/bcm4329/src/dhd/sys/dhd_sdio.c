@@ -3743,6 +3743,8 @@ dhdsdio_hostmail(dhd_bus_t *bus)
 	return intstatus;
 }
 
+extern int is_mmc_resume;
+
 bool
 dhdsdio_dpc(dhd_bus_t *bus)
 {
@@ -3755,8 +3757,20 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	uint framecnt = 0;		  /* Temporary counter of tx/rx frames */
 	bool rxdone = TRUE;		  /* Flag for no more read data */
 	bool resched = FALSE;	  /* Flag indicating resched wanted */
+	uint32 retrylimit = 0; 
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+
+	while (is_mmc_resume) {
+//		printk("Delay during resuming start\n");
+		msleep(10);
+
+		if (retrylimit < 1000)
+			++retrylimit;
+		else 
+			break; 
+//		printk("Delay during resuming end\n");
+	}
 
 	/* Start with leftover status bits */
 	intstatus = bus->intstatus;
@@ -5490,6 +5504,20 @@ int dhdsdio_disable_filters(struct dhd_bus *bus)
    return 0;
 }
 
+int dhd_set_pktfilters(dhd_pub_t *dhd, int enable)
+{
+	int ret = 0;
+	dhd->dhcp_in_progress = 1 - enable;
+	if (enable) {
+		if (dhd->early_suspended) {
+			ret = dhdsdio_enable_filters(dhd->bus);
+		}
+	} else {
+		ret = dhdsdio_disable_filters(dhd->bus);
+	}
+
+	return ret;
+}
 
 
 int dhdsdio_set_pktfilters(dhd_pub_t *dhd)

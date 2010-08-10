@@ -44,8 +44,11 @@
 
 #define PWM_DUTY_MAX    579 /* 13MHz / (579 + 1) = 22.4kHz */
 
-#define FREQ_COUNT		87084	/*89284*/
-
+#ifdef CONFIG_S5PC110_T959_BOARD
+#define FREQ_COUNT		85884	/*89284*/  //85884 //
+#else
+#define FREQ_COUNT		87384
+#endif
 #define PWM_DEVICE	1
 
 struct pwm_device	*Immvib_pwm;

@@ -217,6 +217,10 @@ dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len)
 	if (buf)
 		memcpy(prot->buf, buf, len);
 
+    if (cmd == WLC_SET_VAR) {
+        DHD_CTL(("%s: WLC_SET_VAR='%s'\n", __FUNCTION__, buf));
+    }
+
 	if ((ret = dhdcdc_msg(dhd)) < 0)
 		goto done;
 
@@ -535,12 +539,15 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				(char *)&power_mode, sizeof(power_mode));
 #endif
 #endif
-
+			if (!dhd->dhcp_in_progress) {
 			dhdsdio_enable_filters(dhd->bus);
+			}
 			/* set bcn_li_dtim */
 			bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
 				4, iovbuf, sizeof(iovbuf));
 			dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+
+			dhd->early_suspended = 1;
 #ifdef CUSTOMER_HW2
 			/* Disable build-in roaming to allowed ext supplicant to take of romaing */
 			bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
@@ -548,6 +555,7 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 #endif /* CUSTOMER_HW2 */
 		} else {
 			power_mode = PM_FAST;
+			dhd->early_suspended = 0;
 #ifndef BCMDISABLE_PM
 #if 0
 			dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode,
@@ -749,6 +757,9 @@ dhd_prot_stop(dhd_pub_t *dhd)
 }
 
 dhd_pub_t *dhd_get_pub(struct net_device *dev); /* dhd_linux.c */
+extern void dhd_os_deepsleep_block(void);       /* dhd_linux.c */
+extern void dhd_os_deepsleep_unblock(void);     /* dhd_linux.c */
+extern void dhd_os_deepsleep_wait(void);        /* dhd_linux.c */
 
 int dhd_deepsleep(struct net_device *dev, int flag) 
 {
@@ -759,6 +770,7 @@ int dhd_deepsleep(struct net_device *dev, int flag)
 	int ret = 0;
 	switch (flag) {
 		case 1 :  /* Deepsleep on */
+			dhd_os_deepsleep_wait();
 			DHD_ERROR(("[WiFi] Deepsleep On\n"));
 			
 			/* Disable MPC */
@@ -774,7 +786,7 @@ int dhd_deepsleep(struct net_device *dev, int flag)
 
 		case 0: /* Deepsleep Off */
 			DHD_ERROR(("[WiFi] Deepsleep Off\n"));
-			
+			dhd_os_deepsleep_block();
 			/* Disable Deepsleep */
 			for( cnt = 0 ; cnt < MAX_TRY_CNT ; cnt++ ) {
 				powervar = 0;
@@ -798,6 +810,7 @@ int dhd_deepsleep(struct net_device *dev, int flag)
 			memset(iovbuf,0,sizeof(iovbuf));
 			bcm_mkiovar("mpc", (char *)&powervar, 4, iovbuf, sizeof(iovbuf));
 			dhdcdc_set_ioctl(dhdp, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+			dhd_os_deepsleep_unblock();
 			break;
 	}
 

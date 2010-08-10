@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -173,27 +179,6 @@ extern "C" {                                    /* C declarations in C++     */
 #define     FSR_DUMP_MLC_BLOCK                  (0x00000001)
 
 /*****************************************************************************/
-/* Swapping macro definition                                                 */
-/*****************************************************************************/
-#if defined(FSR_SUPPORT_BE_IMAGE_FOR_FLEXIA) || defined(FSR_SUPPORT_BE_IMAGE_BE_PLATFORM)
-
-
-#define         ENDIAN_SWAP16(X)        { \
-                                            FSR_ASSERT(sizeof(X) == 2); \
-                                            ((X) = ((((X) & 0xFF00) >> 8) | (((X) & 0x00FF) << 8))); \
-                                        }
-
-#define         ENDIAN_SWAP32(X)        { \
-                                            FSR_ASSERT(sizeof(X) == 4); \
-                                            ( (X) = ((((X) & 0xFF000000) >> 24) | \
-                                                 (((X) & 0x00FF0000) >> 8)   | \
-                                                 (((X) & 0x0000FF00) << 8)   | \
-                                                 (((X) & 0x000000FF) << 24)) ); \
-                                        }
-#endif  /* defined(FSR_SUPPORT_BE_IMAGE_FOR_FLEXIA) || defined(FSR_SUPPORT_BE_IMAGE_BE_PLATFORM) */
-
-
-/*****************************************************************************/
 /* #pragma options                                                           */
 /*****************************************************************************/
 #if defined(_WIN32)
@@ -237,8 +222,9 @@ typedef struct
     UINT16      nNANDType;      /**< NAND Type of device                */
 
     UINT16      nDID;           /**< Device ID                          */
-
+    
     UINT16      nPad;           /**< Pad                                */
+
 } FSRDumpDevCxt;
 
 
@@ -340,10 +326,6 @@ VOID    FSR_DBG_RecordStackStart (VOID   *pnStartAddress, UINT8  *pFuncName);
 VOID    FSR_DBG_RecordStackEnd   (VOID   *pnEndAddress,   UINT8  *pFuncName);
 VOID    FSR_DBG_GetStackUsage    (UINT8  *p1stFuncName,   UINT8  *pLastFuncName, UINT32 *pnStackDepth);
 #endif /* FSR_DBG_STACKUSAGE */
-
-
-
-
 
 #ifdef __cplusplus
 }

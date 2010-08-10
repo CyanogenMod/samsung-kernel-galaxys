@@ -1,5 +1,5 @@
 0x00000000	gpio_regon_lock_init	/home/jongmu.choi/brcm/C110/buildroot/project_build_arm/jupiter/modules/bcm4329/dhd	EXPORT_SYMBOL_GPL
 0x00000000	gpio_wlan_poweron	/home/jongmu.choi/brcm/C110/buildroot/project_build_arm/jupiter/modules/bcm4329/dhd	EXPORT_SYMBOL_GPL
 0x00000000	gpio_wlan_poweroff	/home/jongmu.choi/brcm/C110/buildroot/project_build_arm/jupiter/modules/bcm4329/dhd	EXPORT_SYMBOL_GPL
-0x00000000	bcmsdh_remove	/home/jongmu.choi/brcm/C110/buildroot/project_build_arm/jupiter/modules/bcm4329/dhd	EXPORT_SYMBOL
-0x00000000	bcmsdh_probe	/home/jongmu.choi/brcm/C110/buildroot/project_build_arm/jupiter/modules/bcm4329/dhd	EXPORT_SYMBOL
+0x00000000	bcmsdh_remove	/home/b4thend.kim/perforce/behold3/C110/buildroot/project_build_arm/T959/modules/bcm4329/dhd	EXPORT_SYMBOL
+0x00000000	bcmsdh_probe	/home/b4thend.kim/perforce/behold3/C110/buildroot/project_build_arm/T959/modules/bcm4329/dhd	EXPORT_SYMBOL

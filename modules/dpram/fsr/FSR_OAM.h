@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -153,8 +159,6 @@
 #define     FSR_OAM_SM_TYPE_STL         (UINT32) (2)
 #define     FSR_OAM_SM_TYPE_BML         (UINT32) (3)
 #define     FSR_OAM_SM_TYPE_LLD         (UINT32) (4)
-#define     FSR_OAM_SM_TYPE_BML_VOL_0   (UINT32) (3)
-#define     FSR_OAM_SM_TYPE_BML_VOL_1   (UINT32) (5)
 
 /*****************************************************************************/
 /* NULL #defines                                                             */
@@ -203,8 +207,7 @@
 #if defined(FSR_MAMMOTH_POWEROFF)
     #undef  FSR_MAMMOTH_POWEROFF
     #define FSR_MAMMOTH_POWEROFF()  {FSR_RTL_PRINT((TEXT("\nMammoth auto power off protocol : %s,line:%d,func:%s\n"), (const unsigned char *) __FSR_FILE__, __LINE__, (const unsigned char *) __FSR_FUNC__));\
-                                     FSR_RTL_PRINT((TEXT("\n<log P1=\"100\" P2=\"POR\" P3=\"1\" P4=\"mammoth auto power off\" />\n")));\
-                                     while(1);}
+                                     FSR_RTL_PRINT((TEXT("\n<log P1=\"100\" P2=\"POR\" P3=\"1\" P4=\"mammoth auto power off\" />\n")));}
 #else
     #define  FSR_MAMMOTH_POWEROFF()
 #endif

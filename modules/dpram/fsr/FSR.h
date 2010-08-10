@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -167,16 +173,41 @@ typedef     UINT32                              SM32;
 )
 
 /*****************************************************************************/
+/* Big/Little endian macro                                                   */
+/*****************************************************************************/
+#if defined(__arm)
+    #if defined(__BIG_ENDIAN)
+    #define FSR_BIG_ENDIAN
+    #else
+    #define FSR_LITTLE_ENDIAN
+    #endif 
+#else /* define endian */
+    #define FSR_LITTLE_ENDIAN
+#endif
+
+#if defined(__arm)
+    #if defined(__BIG_ENDIAN)
+        #ifdef FSR_LITTLE_ENDIAN
+            #error "FSR endianess mismatch / compiler defines big endian. But source defines FSR_LITTLE_ENDIAN"
+        #endif
+    #else
+        #ifdef FSR_BIG_ENDIAN
+            #error "FSR endianess mismatch / compiler defines little endian. But source defines FSR_BIG_ENDIAN"
+        #endif
+    #endif
+#endif
+
+/*****************************************************************************/
 /* FSR version macro                                                         */
 /*****************************************************************************/
 #define     FSR_VER_MAJOR           1       /** FSR major version            */
-#define     FSR_VER_MINOR1          2       /** FSR minor1 version           */
+#define     FSR_VER_MINOR1          1       /** FSR minor1 version           */
 #define     FSR_VER_MINOR2          1       /** FSR minor2 version           */
-#define     FSR_VER_PATCHLEVEL      1       /** FSR patch version            */
-#define     FSR_BUILD_NUMBER        129     /** FSR build number             */
+#define     FSR_VER_PATCHLEVEL      0       /** FSR patch version            */
+#define     FSR_BUILD_NUMBER        112     /** FSR build number             */
 
-#define     FSR_VER_PREFIX          "FSR_"  /** FSR version prefix           */
-#define     FSR_VERSION_RCX         "RTM"   /** FSR version RC{X} or RTM     */
+#define     FSR_VER_PREFIX          "FSR_" /** FSR version prefix            */
+#define     FSR_VERSION_RCX         "_RC"     /** FSR version RC{X} "RC5_"     */
 /** FSR version code                                                         */
 #define     FSR_VERSION_CODE(major, minor1, minor2, patchlevel) \
             ((major << 24) | (minor1 << 16) | (minor2 << 8) | patchlevel)
@@ -184,10 +215,10 @@ typedef     UINT32                              SM32;
 /** FSR version string                                                       */
 #if (FSR_VER_PATCHLEVEL > 0)
 #define     FSR_VERSION_STR(major, minor1, minor2, patchlevel, buildnum) \
-            #major "." #minor1 "." #minor2 "p" #patchlevel "_" "b" #buildnum "_" FSR_VERSION_RCX
+            #major "." #minor1 "." #minor2 "p" #patchlevel "_" "b0" #buildnum FSR_VERSION_RCX
 #else
 #define     FSR_VERSION_STR(major, minor1, minor2, patchlevel, buildnum) \
-            #major "." #minor1 "." #minor2 "_" "b" #buildnum "_" FSR_VERSION_RCX
+            #major "." #minor1 "." #minor2 "_" "b0" #buildnum FSR_VERSION_RCX
 #endif /* #if (FSR_VER_PATCHLEVEL > 0) */
 
 /** FSR version variable declares                                            */

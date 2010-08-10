@@ -1,18 +1,24 @@
 /**
- *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b032-FSR_1.2.1p1_b129_RTM
+ *   @mainpage   Flex Sector Remapper : RFS_1.3.1_b060-LinuStoreIII_1.1.0_b022-FSR_1.1.1_b112_RC
  *
  *   @section Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
  *    
  *    @section  Copyright
- *---------------------------------------------------------------------------*
- *                                                                           *
- * Copyright (C) 2003-2010 Samsung Electronics                               *
- * This program is free software; you can redistribute it and/or modify      *
- * it under the terms of the GNU General Public License version 2 as         *
- * published by the Free Software Foundation.                                *
- *                                                                           *
- *---------------------------------------------------------------------------*
+ *            COPYRIGHT. 2007-2009 SAMSUNG ELECTRONICS CO., LTD.               
+ *                            ALL RIGHTS RESERVED                              
+ *                                                                             
+ *     Permission is hereby granted to licensees of Samsung Electronics        
+ *     Co., Ltd. products to use or abstract this computer program for the     
+ *     sole purpose of implementing a product based on Samsung                 
+ *     Electronics Co., Ltd. products. No other rights to reproduce, use,      
+ *     or disseminate this computer program, whether in part or in whole,      
+ *     are granted.                                                            
+ *                                                                             
+ *     Samsung Electronics Co., Ltd. makes no representation or warranties     
+ *     with respect to the performance of this computer program, and           
+ *     specifically disclaims any responsibility for any damages,              
+ *     special or consequential, connected with the use of this program.       
  *
  *     @section Description
  *
@@ -119,7 +125,7 @@ extern "C" {
 #define     FSR_BML_FLAG_INFORM_DISTURBANCE_ERROR   (0x00000080)
 
 /* nFlag value for forced erase refresh operation in FSR_BML_Read */
-#define     FSR_BML_FLAG_FORCED_ERASE_REFRESH      (0x00000100)
+#define     FSR_BML_FLAG_FORCED_ERASE_REFRESH       (0x00000100)
 
 /* nFlag value for ingnoring read disturbance */
 #define     FSR_BML_FLAG_IGNORE_READ_DISTURBANCE    (0x00001000)
@@ -160,12 +166,6 @@ extern "C" {
 /* nFeature of FSRDevSpec can have values listed below */
 #define     FSR_BML_FEATURE_NONE                    (0x0000)
 #define     FSR_BML_FEATURE_LSB_RECOVERY_LOAD       (0x0001)
-
-/* nFlag Value for Suspend/Resume */
-#define     FSR_BML_FLAG_RESTORE_BLOCK_STATE        (0x00000001)
-
-/* nFlag Value for FSR_BML_Close */
-#define     FSR_BML_FLAG_CLOSE_ALL                  (0x00000001)
 
 /****************************************************************************/
 /* Some definitions for FSR_BML_Dump()                                      */
@@ -232,7 +232,7 @@ extern "C" {
 
 /* Value for FSR_BML_Read(), FSR_BML_Write(), FSR_BML_Erase() and FSR_BML_CopyBack() */
 #define     FSR_BML_READ_ERROR                  FSR_RETURN_VALUE(1, 01, 0x000C, 0x0000)
-//#define     FSR_BML_READ_DISTURBANCE_ERROR      FSR_RETURN_VALUE(1, 01, 0x000D, 0x0000)
+#define     FSR_BML_READ_DISTURBANCE_ERROR      FSR_RETURN_VALUE(1, 01, 0x000D, 0x0000)
 #define     FSR_BML_ERASE_ERROR                 FSR_RETURN_VALUE(1, 01, 0x000E, 0x0000)
 #define     FSR_BML_WRITE_ERROR                 FSR_RETURN_VALUE(1, 01, 0x000F, 0x0000)
 #define     FSR_BML_WR_PROTECT_ERROR            FSR_RETURN_VALUE(1, 01, 0x0010, 0x0000)
@@ -281,9 +281,6 @@ extern "C" {
 /*****************************************************************************/
 #define     FSR_BML_DUMP_INCOMPLETE             FSR_RETURN_VALUE(1, 01, 0x0050, 0x0000)
 #define     FSR_BML_DUMP_COMPLETE               FSR_RETURN_VALUE(1, 01, 0x0051, 0x0000)
-
-#define     FSR_BML_1LV_READ_DISTURBANCE_ERROR  FSR_RETURN_VALUE(1, 01, 0x0052, 0x0000)
-#define     FSR_BML_2LV_READ_DISTURBANCE_ERROR  FSR_RETURN_VALUE(1, 01, 0x0053, 0x0000)
 
 /*****************************************************************************/
 /* Minor retun value of FSR_BML_Format()                                     */
@@ -362,7 +359,6 @@ extern "C" {
 #define     FSR_BML_PI_ATTR_STL                 0x0100
 #define     FSR_BML_PI_ATTR_DPW                 0x0200
 #define     FSR_BML_PI_ATTR_ENTRYPOINT          0x0400
-#define     FSR_BML_PI_ATTR_STL_HOT             0x0800
 #define     FSR_BML_PI_ATTR_SLC                 0x1000
 #define     FSR_BML_PI_ATTR_MLC                 0x2000
 #define     FSR_BML_PI_ATTR_BOOTLOADING         0x4000
@@ -552,37 +548,8 @@ extern "C" {
                                                            FSR_METHOD_BUFFERED, \
                                                            FSR_READ_ACCESS)
 
-/********************************************************************************/
-/*  PRIVATE BmlBMF     gstBmf0[FSR_MAX_BAD_BLKS];                               */
-/*  PRIVATE BmlBMF     gstBmf1[FSR_MAX_BAD_BLKS];                               */
-/*  PRIVATE UINT32     gstRCB0[FSR_MAX_BAD_BLKS/2];                             */
-/*  PRIVATE UINT32     gstRCB1[FSR_MAX_BAD_BLKS/2];                             */
-/*                                                                              */
-/*  UINT32     nDevIdx;                                                         */
-/*  UINT32     nDieIdx;                                                         */
-/*  UINT32     nNumOfDevs;                                                      */
-/*  UINT32     nRet;                                                            */
-/*  FSRBMInfo  stBMInfo;                                                        */
-/*                                                                              */
-/*  stBMInfo.nNumOfDies    = 0;                                                 */
-/*  stBMInfo.nNumOfBMFs[0] = 0;                                                 */
-/*  stBMInfo.nNumOfBMFs[1] = 0;                                                 */
-/*  stBMInfo.pstBMF[0]     = &gstBmf0[0];                                       */
-/*  stBMInfo.pstBMF[1]     = &gstBmf1[0];                                       */
-/*  stBMInfo.pstRCB[0]     = &gstRCB0[0];                                       */
-/*  stBMInfo.pstRCB[1]     = &gstRCB1[0];                                       */
-/*                                                                              */
-/*  FSR_BML_IOCtl(nVol, FSR_BML_IOCTL_GET_PAIRED_BMI, (UINT8 *) &nDevIdx,       */
-/*            sizeof(nDevIdx), (UINT8 *)&stPairedBMInfo, sizeof(FSRPairedBMInfo), */
-/*            &nRet)                                                            */
-/********************************************************************************/
-#define     FSR_BML_IOCTL_GET_PAIRED_BMI    FSR_IOCTL_CODE(FSR_MODULE_BML,      \
-                                                           0x0E,                \
-                                                           FSR_METHOD_BUFFERED, \
-                                                           FSR_READ_ACCESS)
-
 /**
- *  @brief      Data structure for device specification structure in Volume
+ *  @brief  device specification structure in Volume
  */
 typedef struct
 {
@@ -630,7 +597,7 @@ typedef struct
 } FSRVolSpec;
 
 /**
- *  @brief      Data structure for Random-in argument of FSR_BML_CopyBack
+ *  @brief  data structure for Random-in argument of FSR_BML_CopyBack()
  */
 typedef struct
 {
@@ -642,7 +609,7 @@ typedef struct
 } BMLRndInArg;
 
 /**
- *  @brief      Data structure for FSR_BML_CopyBack
+ *  @brief  data structure for FSR_BML_CopyBack()
  */
 typedef struct
 {
@@ -655,7 +622,7 @@ typedef struct
 } BMLCpBkArg;
 
 /**
- *  @brief      Data structure for partition entry structure
+ *  @brief  partition entry structure
  */
 typedef struct
 {
@@ -663,14 +630,12 @@ typedef struct
     UINT16       nAttr;         /**< attribute                               */
     UINT16       n1stVun;       /**< 1st virtual unit number                 */
     UINT16       nNumOfUnits;   /**< number of units                         */
-    UINT32       nLoadAddr;     /**< Image in this partition can be loaded
-                                     to this RAM address when 'nAttr' has
-                                     'FSR_BML_PI_ATTR_BOOTLOADING' flag      */
+    UINT32       nLoadAddr;     /**< Image is loaded to this RAM address     */
     UINT32       nReserved;     /**< Reserved                                */
 } FSRPartEntry;
 
 /**
- *  @brief      Data structure for partition information structure
+ *  @brief  partition information structure
  */
 typedef struct
 {
@@ -685,7 +650,7 @@ typedef struct
 } FSRPartI;
 
 /**
- *  @brief      Data structure for partition extension information 
+ *  @brief  partition extension information structure
  */
 typedef struct
 {
@@ -695,7 +660,7 @@ typedef struct
 } FSRPIExt;
 
 /**
- *  @brief      Data structure for the input parameter of FSR_BML_IOCTL_CHANGE_PART_ATTR
+ *  @brief      Input data structures of FSR_BML_IOCtl()
  *  @remark     nCode: FSR_BML_IOCTL_CHANGE_PART_ATTR
  */
 typedef struct
@@ -705,7 +670,7 @@ typedef struct
 } FSRChangePA;
 
 /**
- *  @brief      Data structure for reservoir meta block information
+ *  @brief      reservoir meta block information
  */
 typedef struct
 {
@@ -718,7 +683,19 @@ typedef struct
 } FSRRsvrInfo;
 
 /**
- *  @brief      Data structure for the output parameter of FSR_BML_IOCTL_GET_SLC_BOUNDARY
+ *  @brief      Output data structures of FSR_BML_IOCtl()
+ *  @remark     nCode: FSR_BML_IOCTL_GET_BMI
+ */
+typedef struct
+{
+    UINT32         nNumOfDies;                  /**< # of dies              */
+    struct BMF_   *pstBMF[FSR_MAX_DIES];        /**< Array pointer to BMF   */
+    UINT32         nNumOfBMFs[FSR_MAX_DIES];    /**< # of BMFs by die index */
+    FSRRsvrInfo    stRsvInfo[FSR_MAX_DIES];
+} FSRBMInfo;
+
+/**
+ *  @brief      Output data structures of FSR_BML_IOCtl()
  *  @remark     nCode: FSR_BML_IOCTL_GET_SLC_BOUNDARY
  */
 typedef struct
@@ -731,7 +708,7 @@ typedef struct
 } FSRSLCBoundary;
 
 /**
- *  @brief      Data structure for the paramter of FSR_BML_AdjustPartInfo
+ *  @brief      The paramter of FSR_BML_AdjustPartInfo()
  */
 typedef struct
 {
@@ -740,7 +717,7 @@ typedef struct
 } FSRFlashInfo;
 
 /**
- *  @brief      Data structure for partition Entry List for image dump
+ *  @brief  Partition Entry List for image dump
  */
 typedef struct
 {
@@ -749,7 +726,7 @@ typedef struct
 } FSRDumpPEList;
 
 /**
- * @brief       Data structure for storing the info. about BMF(Block Map Field)
+ * @brief  Data structure for storing the info. about BMF(Block Map Field)
  */
 typedef struct BMF_
 {
@@ -757,33 +734,6 @@ typedef struct BMF_
     UINT16     nRbn;            /**< Replaced Block Number in BMI structure
                                      Replaced Block offset in BMS structure  */
 } BmlBMF;
-
-/**
- *  @brief      Output data structures of FSR_BML_IOCtl()
- *  @remark     nCode: FSR_BML_IOCTL_GET_BMI
- */
-typedef struct
-{
-    UINT32         nNumOfDies;                  /**< # of dies              */
-    BmlBMF        *pstBMF[FSR_MAX_DIES];        /**< Array pointer to BMF   */
-    UINT32         nNumOfBMFs[FSR_MAX_DIES];    /**< # of BMFs by die index */
-    FSRRsvrInfo    stRsvInfo[FSR_MAX_DIES];
-} FSRBMInfo;
-
-/**
- *  @brief      Output data structures of FSR_BML_IOCtl()
- *  @remark     nCode: FSR_BML_IOCTL_GET_PAIRED_BMI
- */
-typedef struct
-{
-    UINT32         nNumOfDies;                  /**< # of dies              */
-    BmlBMF        *pstBMF[FSR_MAX_DIES];        /**< Array pointer to BMF   */
-    UINT32         nNumOfBMFs[FSR_MAX_DIES];    /**< # of BMFs by die index */
-    UINT16        *pstRCB[FSR_MAX_DIES];        /**< Array pointer to RCB   */
-    UINT32         nNumOfRCBs[FSR_MAX_DIES];    /**< # of RCBs by die index */
-    FSRRsvrInfo    stRsvInfo[FSR_MAX_DIES];
-} FSRPairedBMInfo;
-
 
 /*****************************************************************************/
 /* exported function prototype of BML                                        */
@@ -794,7 +744,7 @@ typedef struct
 /*****************************************************************************/
 #if !(defined(FSR_NBL2) || defined(TINY_FSR))
 INT32   FSR_BML_Format           (UINT32        nVol,
-                                  FSRPartI     *pstPartI,
+                                  FSRPartI     *pstPart,
                                   UINT32        nFlag);
 INT32   FSR_BML_AdjustPartInfo   (UINT32        nVol,
                                   FSRPartI     *pstPartIIn,
@@ -821,9 +771,10 @@ INT32   FSR_BML_Read             (UINT32        nVol,
                                   UINT8        *pMBuf,
                                   FSRSpareBuf  *pSBuf,
                                   UINT32        nFlag);
+
 INT32   FSR_BML_ReadScts         (UINT32        nVol,
                                   UINT32        nVpn,
-                                  UINT32        n1stSecOff,
+                                  UINT32        nSctoff,
                                   UINT32        nNumOfScts,
                                   UINT8        *pBuf,
                                   FSRSpareBuf  *pSBuf,
@@ -840,9 +791,8 @@ INT32   FSR_BML_Erase            (UINT32        nVol,
                                   UINT32       *nVun,
                                   UINT32        nNumOfUnits, 
                                   UINT32        nFlag);
-INT32   FSR_BML_FlushOp          (UINT32        nVol,
-                                  UINT32        nFlag);
 #endif
+
 INT32   FSR_BML_GetVolSpec       (UINT32        nVol,
                                   FSRVolSpec   *pstVolSpec,
                                   UINT32        nFlag);
@@ -851,22 +801,17 @@ INT32   FSR_BML_LoadPIEntry      (UINT32        nVol,
                                   UINT32       *pn1stVpn,
                                   UINT32       *pnPgsPerUnit,
                                   FSRPartEntry *pstPartEntry);
-#if !defined(FSR_NBL2)
 
+#if !defined(FSR_NBL2)
 INT32   FSR_BML_EraseRefresh     (UINT32        nVol,
                                   UINT32        nNumOfUnit,
                                   UINT32        nFlag);
+INT32   FSR_BML_FlushOp          (UINT32        nVol,
+                                  UINT32        nFlag);
 #endif
 
-
-/*****************************************************************************/
-/* APIs only used in DPM                                                     */
-/*****************************************************************************/
-
-#if !(defined(FSR_NBL2) || defined(TINY_FSR))
 VOID    FSR_BML_AcquireSM        (UINT32        nVol);
 VOID    FSR_BML_ReleaseSM        (UINT32        nVol);
-#endif
 
 /*****************************************************************************/
 /* APIs only used in STL                                                     */
@@ -928,10 +873,10 @@ INT32   FSR_BML_OTPWrite         (UINT32        nVol,
 /*****************************************************************************/
 #if !(defined(FSR_NBL2) || defined(TINY_FSR))
 INT32   FSR_BML_StorePIExt       (UINT32        nVol,
-                                  FSRPIExt     *pPIExt,
+                                  FSRPIExt     *pExtInfo,
                                   UINT32        nFlag);
 INT32   FSR_BML_LoadPIExt        (UINT32        nVol,
-                                  FSRPIExt     *pPIExt,
+                                  FSRPIExt     *pExtInfo,
                                   UINT32        nFlag);
 INT32   FSR_BML_IOCtl            (UINT32        nVol,
                                   UINT32        nCode,
@@ -961,17 +906,6 @@ INT32   FSR_BML_GetVirUnitInfo   (UINT32        nVol,
                                   UINT32       *pnPgsPerUnit);
 INT32   FSR_BML_GetFullPartI     (UINT32        nVol,
                                   FSRPartI     *pstPartI);
-
-/*****************************************************************************/
-/* APIs for Suspend/Resume                                                   */
-/*****************************************************************************/
-#if defined(FSR_BML_SUPPORT_SUSPEND_RESUME)
-INT32   FSR_BML_Suspend         ( UINT32        nVol,
-                                  UINT32        nFlag );
-INT32   FSR_BML_Resume          ( UINT32        nVol,
-                                  UINT32        nFlag );
-#endif  /* #if defined(FSR_BML_SUPPORT_SUSPEND_RESUME) */
-
 #ifdef __cplusplus
 }
 #endif
