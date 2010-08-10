@@ -1,8 +1,8 @@
 // MELFAS HEX Studio v0.6 [2009.10.12]
 
-const uint16_t MELFAS_binary_nLength = 0x32B2;	// 12.7 KBytes ( 12978 )
+const uint16_t MELFAS_binary_nLength_v03 = 0x32B2;	// 12.7 KBytes ( 12978 )
 
-const  uint8_t MELFAS_binary[] = {
+const  uint8_t MELFAS_binary_v03[] = {
 
 	// Model name       : VTW0008
 	// Module revision  : R04

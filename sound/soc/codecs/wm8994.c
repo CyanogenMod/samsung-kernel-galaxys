@@ -36,10 +36,26 @@
 #include <plat/map-base.h>
 #include <plat/regs-clock.h>
 #include "wm8994.h"
-
+#ifdef CONFIG_KEPLER_AUDIO_A1026
+#define __A1026ENA_IN_AUDIODRV_LDJ__
+#endif
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+#include "A1026_regs.h"
+#include "A1026_dev.h"
+#include "A1026_i2c_drv.h"
+#include "ttymisc.h"
+#include "audience.h"
+#else
+#include "HAC.h"
+#endif
 #define WM8994_VERSION "0.1"
+
+
 #define SUBJECT "wm8994.c"
 
+/* WM8994 AUDIO POWER CONTROL */
+static struct wm8994_priv *localwm8994; //hdlnc_bp_ysyim
+int call_state(void); //hdlnc_bp_ysyim
 //------------------------------------------------
 // Definitions of clock related.
 //------------------------------------------------
@@ -125,7 +141,7 @@ select_route universal_wm8994_playback_paths[] =
 
 select_route universal_wm8994_voicecall_paths[] = 
 	{wm8994_set_off, wm8994_set_voicecall_receiver, 
-	wm8994_set_voicecall_speaker, wm8994_set_voicecall_headset, wm8994_set_voicecall_bluetooth}; 
+	wm8994_set_voicecall_speaker, wm8994_set_voicecall_headset, wm8994_set_voicecall_bluetooth,wm8994_set_voicecall_headphone}; 
 
 select_mic_route universal_wm8994_mic_paths[] = {wm8994_record_main_mic, wm8994_record_headset_mic, wm8994_record_bluetooth};
 
@@ -247,7 +263,7 @@ static int wm899x_inpga_put_volsw_vu(struct snd_kcontrol *kcontrol,
 //------------------------------------------------
 #define MAX_VOICECALL_PATH 4
 static const char *playback_path[] = { "OFF", "RCV", "SPK", "HP", "BT", "DUAL", "RING_SPK", "RING_HP", "RING_DUAL", "EXTRA_DOCK_SPEAKER", "TV_OUT"};
-static const char *voicecall_path[] = { "OFF", "RCV", "SPK", "HP", "BT", };
+static const char *voicecall_path[] = { "OFF", "RCV", "SPK", "HP", "BT","HP3POLE", };
 static const char *fmradio_path[] = { "FMR_OFF", "FMR_SPK", "FMR_HP", "FMR_SPK_MIX", "FMR_HP_MIX", "FMR_DUAL_MIX"};
 static const char *mic_path[] = { "Main Mic", "Hands Free Mic", };
 static const char *codec_tuning_control[] = {"OFF", "ON"};
@@ -432,6 +448,7 @@ static int wm8994_set_call_path(struct snd_kcontrol *kcontrol,
 		case RCV :
 		case HP :
 		case BT :
+		case DUAL : // headphone 3 pole
 			DEBUG_LOG("routing  voice path to  %s \n", mc->texts[path_num] );
 			break;
 		
@@ -441,10 +458,20 @@ static int wm8994_set_call_path(struct snd_kcontrol *kcontrol,
 			break;
 	}
 
-	if(wm8994->cur_path != path_num || !(wm8994->codec_state & CALL_ACTIVE))
+	if(wm8994->cur_path != path_num || !(wm8994->codec_state & CALL_ACTIVE) || path_num==RCV) //hdlnc_ldj_0417_A1026
 	{
 		wm8994->codec_state |= CALL_ACTIVE;
 		wm8994->cur_path = path_num;
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	if (factory_sub_mic_status() == FACTORY_SUB_MIC_ON) 
+		wm8994_set_voicecall_factory_subMIC(codec);
+	else if(ttymisc_state() && (path_num==HP)) wm8994_set_voicecall_tty(codec);
+	else if(audience_state() && (path_num==RCV)) wm8994_set_voicecall_receiver_audience(codec); //hdlnc_ldj_0417_A1026
+	else		
+#else
+	if(hac_state() && (path_num==RCV)) wm8994_set_voicecall_hac(codec);
+	else
+#endif
 		wm8994->universal_voicecall_path[wm8994->cur_path](codec);
 	}
 	else
@@ -456,7 +483,9 @@ static int wm8994_set_call_path(struct snd_kcontrol *kcontrol,
 		val |= (WM8994_AIF1DAC1_UNMUTE);
 		wm8994_write(codec, WM8994_AIF1_DAC1_FILTERS_1, val);
 	}
-
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	A1026Wakeup();
+#endif	
 	return 0;
 }
 
@@ -1389,7 +1418,8 @@ void wm8994_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *co
 		DEBUG_LOG_ERR("Testmode is activated!! Don't shutdown(reset) sequence!!");
 		return;
 	}
-
+	
+	//hdlnc_ysyim_2010-4-26: remove log for popupnois when usb unmout	
 	DEBUG_LOG("Stream_state = [0x%X],  Codec State = [0x%X]", wm8994->stream_state, wm8994->codec_state);
 
 	if(substream->stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -1406,11 +1436,15 @@ void wm8994_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *co
 	if((wm8994->codec_state == DEACTIVE) && (wm8994->stream_state == PCM_STREAM_DEACTIVE))
 	{		
 			DEBUG_LOG("Turn off Codec!!");
-			audio_ctrl_mic_bias_gpio(0);
+			//audio_ctrl_mic_bias_gpio(0);  // 2010.04.28 ytkwon
 			wm8994->power_state = CODEC_OFF;
 			wm8994->fmradio_path = FMR_OFF;
 			wm8994->cur_path = OFF;
 			wm8994->ringtone_active = OFF;
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+				A1026Sleep();
+#endif
+
 			wm8994_write(codec, WM8994_SOFTWARE_RESET, 0x0000);
 #if defined ATTACH_ADDITINAL_PCM_DRIVER
 			vtCallActive = 0;
@@ -1422,7 +1456,8 @@ void wm8994_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *co
 
 	if(substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 	{
-		wm8994_disable_rec_path(codec, wm8994->rec_path);
+		if(wm8994->codec_state != CALL_ACTIVE)
+			wm8994_disable_rec_path(codec, wm8994->rec_path);
 		wm8994->codec_state &= ~(CAPTURE_ACTIVE);
 	}
 	else	// Playback
@@ -1567,6 +1602,13 @@ struct snd_soc_dai wm8994_pcm_dai = {
 EXPORT_SYMBOL_GPL(wm8994_pcm_dai);
 #endif
 
+//[ hdlnc_bp_ysyim
+int call_state(void)
+{
+	return localwm8994->codec_state;
+}
+//] hdlnc_bp_ysyim
+
 /*
  * initialise the WM8994 driver
  * register the mixer and dsp interfaces with the kernel
@@ -1575,6 +1617,10 @@ static int wm8994_init(struct snd_soc_device *socdev)
 {
 	struct snd_soc_codec *codec = socdev->codec;
 	struct wm8994_priv *wm8994 = codec->private_data;
+//[hdlnc_bp_ysyim
+	localwm8994=wm8994;
+//]hdlnc_bp_ysyim
+
 	int ret = 0;
 
 	DEBUG_LOG("");
@@ -1800,6 +1846,9 @@ static int wm8994_probe(struct platform_device *pdev)
 {
 	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
 	struct wm8994_setup_data *setup;
+	#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	struct a1026_setup_data *setup_a1026;
+	#endif
 	struct snd_soc_codec *codec;
 	struct wm8994_priv *wm8994;
 	int ret = 0;
@@ -1809,7 +1858,23 @@ static int wm8994_probe(struct platform_device *pdev)
 	/* Board Specific Function */
 	audio_init();
 	audio_power(1);
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	A1026_dev_mutex_init();
+    /*Add the i2c driver*/
+    if ( (ret = A1026_i2c_drv_init() < 0) ) 
+    {
+    	error("A1026_driver_init i2c driver failed");
+       return ret;
+    }
 	
+    debug("A1026_driver_init successful");  
+	A1026_dev_powerup();
+	A1026Sleep();
+	ttymisc_probe();
+	audience_probe();
+#else
+	hac_probe();
+#endif	
 	setup = socdev->codec_data;
 	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
 	if (codec == NULL)
@@ -1934,16 +1999,34 @@ static int wm8994_suspend(struct platform_device *pdev,pm_message_t msg )
 	if(wm8994->testmode_config_flag)
 	{
 		DEBUG_LOG_ERR("Testmode is activated!! Skip suspend sequence!!");
+		#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+		unsigned int tmp = __raw_readl(S5P_SLEEP_CFG);
+		tmp |= (S5P_SLEEP_CFG_OSC_EN | S5P_SLEEP_CFG_USBOSC_EN);	
+		__raw_writel(tmp , S5P_SLEEP_CFG);
+		#endif
+
 		return 0;
 	}
 
 	if(wm8994->codec_state == DEACTIVE && wm8994->stream_state == PCM_STREAM_DEACTIVE)
 	{
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+//		A1026Sleep();
+#endif		
+		audio_ctrl_mic_bias_gpio(0);  // 2010.05.03 ytkwon		
 		wm8994->power_state = CODEC_OFF;
 		wm8994_write(codec, WM8994_SOFTWARE_RESET, 0x0000);
 		audio_power(0);
 	}
 		
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	else 
+	{
+		unsigned int tmp = __raw_readl(S5P_SLEEP_CFG);
+		tmp |= (S5P_SLEEP_CFG_OSC_EN | S5P_SLEEP_CFG_USBOSC_EN);	
+		__raw_writel(tmp , S5P_SLEEP_CFG);
+	}
+#endif	
 	return 0;
 }
 
@@ -1953,11 +2036,16 @@ static int wm8994_resume(struct platform_device *pdev)
 	struct snd_soc_codec *codec = socdev->codec;
 	struct wm8994_priv *wm8994 = codec->private_data;
 
-	DEBUG_LOG_INFO("------WM8994 Revision = [%d]-------", wm8994->hw_version);
+	printk("WM8994 Revision = [%d]", wm8994->hw_version);
 
 	if(wm8994->testmode_config_flag)
 	{
 		DEBUG_LOG_ERR("Testmode is activated!! Skip resume sequence!!");
+		#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+		unsigned int tmp = __raw_readl(S5P_SLEEP_CFG);
+		tmp &= ~(S5P_SLEEP_CFG_OSC_EN | S5P_SLEEP_CFG_USBOSC_EN);	
+		__raw_writel(tmp , S5P_SLEEP_CFG);
+		#endif
 		return 0;
 	}
 
@@ -1972,6 +2060,14 @@ static int wm8994_resume(struct platform_device *pdev)
 
 		wm8994_write(codec,WM8994_OVERSAMPLING, 0x0000);
 	}
+#ifdef __A1026ENA_IN_AUDIODRV_LDJ__
+	else 
+	{
+			unsigned int tmp = __raw_readl(S5P_SLEEP_CFG);
+			tmp &= ~(S5P_SLEEP_CFG_OSC_EN | S5P_SLEEP_CFG_USBOSC_EN);	
+			__raw_writel(tmp , S5P_SLEEP_CFG);
+	}
+#endif	
 	return 0;
 }
 #endif

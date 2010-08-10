@@ -145,6 +145,14 @@
 #define GPIO_AP_SCL_29V_AF		2
 #endif
 
+//[ hdlnc_bp_ytkwon : 20100301
+#define GPIO_A1026_SDA			S5PC11X_MP04(5)
+#define GPIO_A1026_SDA_AF		2
+
+#define GPIO_A1026_SCL			S5PC11X_MP04(4)
+#define GPIO_A1026_SCL_AF		2
+//] hdlnc_bp_ytkwon : 20100301
+
 #define GPIO_CAM_PCLK			S5PC11X_GPE0(0)
 #define GPIO_CAM_PCLK_AF		2
 
@@ -465,6 +473,12 @@
 
 #define GPIO_EAR_SEND_END		S5PC11X_GPH3(6)
 #define GPIO_EAR_SEND_END_AF	0xFF
+
+//[ hdlnc_bp_ytkwon : 20100310
+#define GPIO_EAR_SEND_END35		S5PC11X_GPH2(2)
+#define GPIO_EAR_SEND_END35_AF	0xFF
+//] hdlnc_bp_ytkwon : 20100310
+
 #define GPIO_CP_RST				S5PC11X_GPH3(7)
 
 #define GPIO_CODEC_I2S_CLK		S5PC11X_GPI(0)
@@ -633,6 +647,10 @@
 #endif
 
 #define GPIO_MICBIAS_EN			S5PC11X_GPJ4(2)
+ 
+#define GPIO_EARMICBIAS_EN			S5PC11X_GPJ4(4) //hdlnc_ysyim_2010-05-03	: from Kepler05(HWRE=0x06)
+ 
+#define GPIO_MICBIAS_EN2			S5PC11X_GPJ2(5) //hdlnc_ysyim_2010-05-04: from SGH-T959 REV0.5(HWREV = 0x0e)	 or 0.6 (HWREV = 0x0f)			
 
 #define GPIO_AP_PMIC_SCL		S5PC11X_GPJ4(3)
 

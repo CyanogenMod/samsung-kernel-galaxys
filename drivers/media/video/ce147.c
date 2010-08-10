@@ -2017,7 +2017,14 @@ static int ce147_set_capture_exif(struct v4l2_subdev *sd)
 
 	unsigned char ce147_model_name[130] = {0x00,};
 	unsigned int ce147_reglen_model = 130;	
-	unsigned char ce147_str_model[9] = "GT-I9000";
+//NAGSM_Android_SEL_Multimedia_Pankaj_20100514_START
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) 
+        unsigned char ce147_str_model[9] = "SGH-I897";
+#endif
+#if defined (CONFIG_S5PC110_T959_BOARD)
+        unsigned char ce147_str_model[9] = "SGH-T959";
+#endif
+//NAGSM_Android_SEL_Multimedia_Pankaj_20100514_END
 
 	struct timeval curr_time;
 	struct rtc_time time;
@@ -4605,7 +4612,7 @@ static int ce147_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		}
 		else
 		{
-			err = ce147_set_white_balance(sd, ctrl);		
+		err = ce147_set_white_balance(sd, ctrl);
 		}
 		break;
 
@@ -4619,9 +4626,9 @@ static int ce147_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		}
 		else
 		{
-			err = ce147_set_effect(sd, ctrl);		
+		err = ce147_set_effect(sd, ctrl);
 		}
-		break;		
+		break;
 
 	case V4L2_CID_CAMERA_ISO:
 		//dev_err(&client->dev, "%s: V4L2_CID_CAMERA_ISO, runmode %d	\n", __func__, state->runmode);
@@ -4927,6 +4934,28 @@ static int ce147_init(struct v4l2_subdev *sd, u32 val)
 		dev_err(&client->dev, "%s: Failed: Reading sensor info\n",__func__);
 		return -EIO;
 	}
+
+//NAGSM_Android_SEL_Multimedia_Pankaj_20100504_START
+#if 0
+	err = ce147_get_sensor_maker_version(sd);
+	if(err < 0){
+		dev_err(&client->dev, "%s: Failed: Reading maker info\n",__func__);
+		return -EIO;
+	}
+
+	err = ce147_get_af_version(sd);
+	if(err < 0){
+		dev_err(&client->dev, "%s: Failed: Reading af info\n",__func__);
+		return -EIO;
+	}
+
+	err = ce147_get_gamma_version(sd);
+	if(err < 0){
+		dev_err(&client->dev, "%s: Failed: Reading camera gamma info\n",__func__);
+		return -EIO;
+	}
+#endif
+//NAGSM_Android_SEL_Multimedia_Pankaj_20100504_END
 	printk(KERN_DEBUG "fw M:%d m:%d |prm M:%d m:%d \n", MAIN_SW_FW[0], MAIN_SW_FW[1], MAIN_SW_FW[2], MAIN_SW_FW[3]);
 	printk(KERN_DEBUG "y. m. d = %d.%d.%d \n", MAIN_SW_DATE_INFO[0], MAIN_SW_DATE_INFO[1], MAIN_SW_DATE_INFO[2]);
 

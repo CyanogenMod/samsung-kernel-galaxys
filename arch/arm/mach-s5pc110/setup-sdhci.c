@@ -56,23 +56,23 @@ void s3c6410_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
 	/* Set all the necessary GPG0 ins to special-function 2 */
 	for (gpio = S5PC11X_GPG0(0); gpio < end; gpio++) {
 		if(gpio != S5PC11X_GPG0(2)) {
-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		}
+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+	}
 	}
 
-	writel(0x2aaa, S5PC11X_GPG0DRV);
+	writel(0x2aaa, S5PC11X_GPG0DRV);	
 
 	/* Chip detect pin Pull up*/
 	s3c_gpio_setpull(S5PC11X_GPG0(2), S3C_GPIO_PULL_NONE);
 
 #if !(defined CONFIG_JUPITER_VER_B4) 
 	s3c_gpio_cfgpin(S5PC11X_GPJ2(7), S3C_GPIO_OUTPUT);
-	s3c_gpio_setpull(S5PC11X_GPJ2(7), S3C_GPIO_PULL_NONE);
-	gpio_set_value(S5PC11X_GPJ2(7), 1);
+    	s3c_gpio_setpull(S5PC11X_GPJ2(7), S3C_GPIO_PULL_NONE);
+    	gpio_set_value(S5PC11X_GPJ2(7), 1);
 #endif	
 }
-
+	
 #define S3C_SDHCI_CTRL3_FCSELTX_INVERT  (0)
 #define S3C_SDHCI_CTRL3_FCSELTX_BASIC   (S3C_SDHCI_CTRL3_FCSEL3 | S3C_SDHCI_CTRL3_FCSEL2)
 #define S3C_SDHCI_CTRL3_FCSELRX_INVERT  (0)
@@ -138,13 +138,13 @@ void s3c6410_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
 
 	/* Set all the necessary GPG1 pins to special-function 2 */
 	for (gpio = S5PC11X_GPG1(0); gpio < end; gpio++) {
-		//WLAN_nRST  set pull_none and low
+	//WLAN_nRST  set pull_none and low
 		if (gpio != S5PC11X_GPG1(2)){
 			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
 			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		}
 	}
-	writel(0x2aaa, S5PC11X_GPG1DRV);
+	writel(0x2aaa, S5PC11X_GPG1DRV);	
 
 	//WLAN_nRST(S5PC11X_GPG1(2)) set pull_none and low
 	/* Chip detect pin Pull up*/
@@ -165,12 +165,12 @@ void s3c6410_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
 	/* Set all the necessary GPG2 pins to special-function 2 */
 	for (gpio = S5PC11X_GPG2(0); gpio < end; gpio++) {
 		if(gpio != S5PC11X_GPG2(2)) {
-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		}
+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+	}
 	}
 
-	writel(0x2aaa, S5PC11X_GPG2DRV);
+	writel(0x2aaa, S5PC11X_GPG2DRV);	
 
 	/* Chip detect pin Pull up*/
 	s3c_gpio_setpull(S5PC11X_GPG2(2), S3C_GPIO_PULL_NONE);
@@ -193,7 +193,7 @@ void s3c6410_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 	}
 
-	writel(0x2aaa, S5PC11X_GPG3DRV);
+	writel(0x2aaa, S5PC11X_GPG3DRV);	
 
 	/* Chip detect pin Pull up*/
 	s3c_gpio_setpull(S5PC11X_GPG3(2), S3C_GPIO_PULL_NONE);
@@ -219,6 +219,9 @@ unsigned int universal_sdhci2_detect_ext_cd(void)
 #else
 	card_status = (readl(S5PC11X_GPH3DAT)) & (1 << 4);
 	printk(KERN_DEBUG " Universal : Card status  %d\n",card_status?1:0);
+#if 1 // Behold3 and Kepler
+	return card_status ? 0 : 1;
+#else
 	if(((HWREV >= 7) || (HWREV == 0x3)) && (HWREV !=8))
 	{
 		return card_status ? 0 : 1;
@@ -227,6 +230,7 @@ unsigned int universal_sdhci2_detect_ext_cd(void)
 	{
 		return card_status ? 1 : 0;
 	}
+#endif
 #endif
 }
 
@@ -254,10 +258,14 @@ void universal_sdhci2_cfg_ext_cd(void)
 		//s3c_gpio_cfgpin(S5PC11X_GPH3(4),S5PC11X_GPH3_4_EXT_INT33_4);
 		//s3c_gpio_setpull(S5PC11X_GPH3(4), S3C_GPIO_PULL_DOWN);
 	}
+#if 1 // Behold3 and Kepler
+	s3c_gpio_setpull(S5PC11X_GPH3(4), S3C_GPIO_PULL_UP);
+#else
 	if(((HWREV >= 7) || (HWREV == 0x3)) && (HWREV !=8))
 	{
 		s3c_gpio_setpull(S5PC11X_GPH3(4), S3C_GPIO_PULL_UP);
 	}
+#endif	
 	set_irq_type(IRQ_EINT(28), IRQ_TYPE_EDGE_BOTH);
 #endif
 }

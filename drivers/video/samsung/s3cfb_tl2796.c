@@ -143,7 +143,12 @@ const unsigned short s6e63m0_SEQ_SETTING[] = {
 	0x110,
 	
 	0x0F7,
-	0x103,	0x100,	
+#ifdef CONFIG_S5PC110_FLEMING_BOARD
+	0x100,
+#else
+	0x103,
+#endif
+	0x100,	
 	0x100,
 	
 	//etc condition set
@@ -1321,7 +1326,7 @@ const unsigned short s6e63m0_22gamma_50cd[] = {
                                                 
 const unsigned short *p22Gamma_set[] = {        
                                                 
-	s6e63m0_22gamma_50cd,//0                               
+	s6e63m0_22gamma_50cd,//0                      
 	s6e63m0_22gamma_70cd,                         
 	s6e63m0_22gamma_80cd,                         
 	s6e63m0_22gamma_90cd,                         
@@ -1346,7 +1351,7 @@ const unsigned short *p22Gamma_set[] = {
 	s6e63m0_22gamma_280cd,                        
 	s6e63m0_22gamma_290cd,                        
 	s6e63m0_22gamma_300cd,//24                    
-};                                             
+};                                              
                                                 
 const unsigned short s6e63m0_19gamma_300cd[] = {
 	//gamma set                                   
@@ -2493,7 +2498,7 @@ const unsigned short *p19Gamma_set[] = {
 	s6e63m0_19gamma_280cd,                        
 	s6e63m0_19gamma_290cd,                        
 	s6e63m0_19gamma_300cd,//25                    
-}; 
+};                                           
 
 #ifdef ACL_ENABLE
 const unsigned short acl_cutoff_off[] = {
@@ -2804,12 +2809,12 @@ void bl_update_status_22gamma(int bl)
 			break;
 		
 		msleep(10);
-	};	
+	};
 
 	if(!(current_gamma_value == -1))
 	{
-		gprintk("#################22gamma start##########################\n");
-		s6e63m0_panel_send_sequence(p22Gamma_set[current_gamma_value]);
+	gprintk("#################22gamma start##########################\n");
+	s6e63m0_panel_send_sequence(p22Gamma_set[current_gamma_value]);
 		gprintk("#################22gamma end##########################\n");
 	}
 
@@ -2836,9 +2841,9 @@ void bl_update_status_19gamma(int bl)
 
 	if(!(current_gamma_value == -1))
 	{
-		gprintk("#################19gamma start##########################\n");
-		s6e63m0_panel_send_sequence(p19Gamma_set[current_gamma_value]);
-		gprintk("#################19gamma end##########################\n");
+	gprintk("#################19gamma start##########################\n");
+	s6e63m0_panel_send_sequence(p19Gamma_set[current_gamma_value]);
+	gprintk("#################19gamma end##########################\n");
 	}
 
 	//printk("bl_update_status_19gamma : current_gamma_value(%d) \n",current_gamma_value);
@@ -2910,7 +2915,7 @@ static ssize_t aclset_file_cmd_store(struct device *dev, struct device_attribute
 	}
 
 	if(value==1 && acl_enable == 0)
-	{		
+	{
 		acl_enable = value;
 		
 		s6e63m0_panel_send_sequence(acl_cutoff_init);
@@ -2990,7 +2995,7 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 	int level = 0;
 	int gamma_value = 0;
 	int gamma_val_x10 = 0;
-	
+
 	int i = 0;
 
 	for(i=0; i<100; i++)
@@ -3004,7 +3009,7 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 	};
 	
 	gprintk("\nupdate status brightness[0~255] : (%d) \n",bd->props.brightness);
-	
+
 	if(IsLDIEnabled())
 	{
 	#if 0
@@ -3014,23 +3019,23 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 				bl = DIM_BL;
 		}
 	#endif
-		if(bl == 0)
-			level = 0;	//lcd off
+	if(bl == 0)
+		level = 0;	//lcd off
 		else if((bl < MIN_BL) && (bl > 0))
-			level = 1;	//dimming
-		else
-			level = 6;	//normal
+		level = 1;	//dimming
+	else
+		level = 6;	//normal
 
-		if(level==0)
-		{
-			msleep(20);
-			s6e63m0_panel_send_sequence(s6e63m0_SEQ_DISPLAY_OFF);
-			gprintk("Update status brightness[0~255]:(%d) - LCD OFF \n", bl);
-			bd_brightness = 0;
-			backlight_level = 0;
-			current_gamma_value = -1;
-			return 0;
-		}	
+	if(level==0)
+	{
+		msleep(20);
+		s6e63m0_panel_send_sequence(s6e63m0_SEQ_DISPLAY_OFF);
+		gprintk("Update status brightness[0~255]:(%d) - LCD OFF \n", bl);
+		bd_brightness = 0;
+		backlight_level = 0;
+		current_gamma_value = -1;
+		return 0;
+	}	
 
 		if (bl >= MIN_BL)
 		{
@@ -3038,21 +3043,21 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 			gamma_value = (gamma_val_x10+5)/10;
 		}	
 		else
-		{
+	{
 			gamma_value = 0;
-		}
+	}
 
-		bd_brightness = bd->props.brightness;
-		backlight_level = level;
+	bd_brightness = bd->props.brightness;
+	backlight_level = level;
 
 		if(current_gamma_value == gamma_value)
 		{
 			return 0;
 		}
-		gprintk("Update status brightness[0~255]:(%d) gamma_value:(%d) on_19gamma(%d)\n", bl,gamma_value,on_19gamma);
-			
-	 	if(level)
-		{
+	gprintk("Update status brightness[0~255]:(%d) gamma_value:(%d) on_19gamma(%d)\n", bl,gamma_value,on_19gamma);
+		
+ 	if(level)
+	{
 			#ifdef MDNIE_TUNINGMODE_FOR_BACKLIGHT
 			if((pre_val==1)&&(gamma_value < 24)&&(autobrightness_mode))
 			{
@@ -3062,48 +3067,48 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 			}
 			#endif
 			
-			switch(level)
-			{
-				case  5:
-				case  4:
-				case  3:
-				case  2:
-				case  1: //dimming
-				{	
-					if(on_19gamma)
+		switch(level)
+		{
+			case  5:
+			case  4:
+			case  3:
+			case  2:
+			case  1: //dimming
+			{	
+				if(on_19gamma)
 						s6e63m0_panel_send_sequence(p19Gamma_set[0]);
-					else
+				else
 						s6e63m0_panel_send_sequence(p22Gamma_set[0]);
 
-				
-				#ifdef ACL_ENABLE
-					if (acl_enable)
+			
+			#ifdef ACL_ENABLE
+				if (acl_enable)
+				{
+					if (cur_acl != 0)
+					{
+						s6e63m0_panel_send_sequence(ACL_cutoff_set[0]); //set 0% ACL
+						gprintk(" ACL_cutoff_set Percentage : 0!!\n");
+						cur_acl = 0;
+					}
+				}
+			#endif
+				gprintk("call s5p_bl_update_status level : %d\n",level);
+				break;
+			}
+			case  6:
+			{								
+			#ifdef ACL_ENABLE
+				if (acl_enable)
+				{
+						if (gamma_value ==1)
 					{
 						if (cur_acl != 0)
 						{
 							s6e63m0_panel_send_sequence(ACL_cutoff_set[0]); //set 0% ACL
-							gprintk(" ACL_cutoff_set Percentage : 0!!\n");
 							cur_acl = 0;
+							gprintk(" ACL_cutoff_set Percentage : 0!!\n");
 						}
 					}
-				#endif
-					gprintk("call s5p_bl_update_status level : %d\n",level);
-					break;
-				}
-				case  6:
-				{								
-				#ifdef ACL_ENABLE
-					if (acl_enable)
-					{				
-						if (gamma_value ==1)
-						{
-							if (cur_acl != 0)
-							{
-								s6e63m0_panel_send_sequence(ACL_cutoff_set[0]); //set 0% ACL
-								cur_acl = 0;
-								gprintk(" ACL_cutoff_set Percentage : 0!!\n");
-							}
-						}
 						else
 						{
 							if (cur_acl == 0)
@@ -3113,53 +3118,53 @@ static int s5p_bl_update_status(struct backlight_device* bd)
 							}
 							
 							if(gamma_value ==2)
-							{
-								if (cur_acl != 12)
-								{
-									s6e63m0_panel_send_sequence(ACL_cutoff_set[1]); //set 12% ACL
-									cur_acl = 12;
-									gprintk(" ACL_cutoff_set Percentage : 12!!\n");
-								}
-							}
-							else if(gamma_value ==3)
-							{
-								if (cur_acl != 22)
-								{
-									s6e63m0_panel_send_sequence(ACL_cutoff_set[2]); //set 22% ACL
-									cur_acl = 22;
-									gprintk(" ACL_cutoff_set Percentage : 22!!\n");
-								}
-							}
-							else if(gamma_value ==4)
-							{
-								if (cur_acl != 30)
-								{
-									s6e63m0_panel_send_sequence(ACL_cutoff_set[3]); //set 30% ACL
-									cur_acl = 30;
-									gprintk(" ACL_cutoff_set Percentage : 30!!\n");
-								}
-							}
-							else if(gamma_value ==5)
-							{
-								if (cur_acl != 35)
-								{
-									s6e63m0_panel_send_sequence(ACL_cutoff_set[4]); //set 35% ACL
-									cur_acl = 35;
-									gprintk(" ACL_cutoff_set Percentage : 35!!\n");
-								}
-							}
-							else
-							{
-								if(cur_acl !=40)
-								{
-									s6e63m0_panel_send_sequence(ACL_cutoff_set[5]); //set 40% ACL
-									cur_acl = 40;
-									gprintk(" ACL_cutoff_set Percentage : 40!!\n");
-								}
-							}
+					{
+						if (cur_acl != 12)
+						{
+							s6e63m0_panel_send_sequence(ACL_cutoff_set[1]); //set 12% ACL
+							cur_acl = 12;
+							gprintk(" ACL_cutoff_set Percentage : 12!!\n");
 						}
 					}
-				#endif		
+							else if(gamma_value ==3)
+					{
+						if (cur_acl != 22)
+						{
+							s6e63m0_panel_send_sequence(ACL_cutoff_set[2]); //set 22% ACL
+							cur_acl = 22;
+							gprintk(" ACL_cutoff_set Percentage : 22!!\n");
+						}
+					}
+							else if(gamma_value ==4)
+					{
+						if (cur_acl != 30)
+						{
+							s6e63m0_panel_send_sequence(ACL_cutoff_set[3]); //set 30% ACL
+							cur_acl = 30;
+							gprintk(" ACL_cutoff_set Percentage : 30!!\n");
+						}
+					}
+							else if(gamma_value ==5)
+					{
+						if (cur_acl != 35)
+						{
+							s6e63m0_panel_send_sequence(ACL_cutoff_set[4]); //set 35% ACL
+							cur_acl = 35;
+							gprintk(" ACL_cutoff_set Percentage : 35!!\n");
+						}
+					}
+					else
+					{
+						if(cur_acl !=40)
+						{
+							s6e63m0_panel_send_sequence(ACL_cutoff_set[5]); //set 40% ACL
+							cur_acl = 40;
+							gprintk(" ACL_cutoff_set Percentage : 40!!\n");
+						}
+					}
+						}
+					}
+				#endif
 	
 					if(on_19gamma)
 						s6e63m0_panel_send_sequence(p19Gamma_set[gamma_value]);

@@ -49,7 +49,38 @@
     { { -1,  0,  0}, \
       { 0,  1,   0}, \
       { 0 , 0 ,  -1} }
-      
+
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)
+#define YAMAHA_GSENSOR_TRANSFORMATION_KEPLER    \
+    { { 0,  1,  0}, \
+      { -1,  0,  0}, \
+      { 0,  0,  -1} }
+#define YAMAHA_MSENSOR_TRANSFORMATION_KEPLER    \
+    { { 0,  -1,  0}, \
+      { -1,  0,   0}, \
+      { 0 , 0 ,  -1} }
+
+#define YAMAHA_MSENSOR_TRANSFORMATION_KEPLER_B5     \
+    { { 0,  1,  0}, \
+      { -1,  0,  0}, \
+      { 0 , 0 , 1} }
+
+
+
+#elif defined(CONFIG_S5PC110_T959_BOARD)
+#define YAMAHA_GSENSOR_TRANSFORMATION_KEPLER    \
+    { { -1,  0,  0}, \
+      { 0,  -1,  0}, \
+      { 0,  0,  -1} }
+
+#define YAMAHA_MSENSOR_TRANSFORMATION_KEPLER    \
+    { { -1,  0,  0}, \
+      { 0,  1,   0}, \
+      { 0 , 0 ,  -1} }
+
+
+#endif
+
 #define YAMAHA_IOCTL_GET_MARRAY            _IOR('Y', 0x01, char[9])
 #define YAMAHA_IOCTL_GET_GARRAY            _IOR('Y', 0x02, char[9])
 
@@ -65,23 +96,62 @@ static int
 yamaha_ioctl(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)
+	signed char marray[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_KEPLER;
+	signed char garray[3][3] = YAMAHA_GSENSOR_TRANSFORMATION_KEPLER;
+	signed char marray_B5[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_KEPLER_B5;
 
+#elif  defined(CONFIG_S5PC110_T959_BOARD)
+	signed char marray[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_KEPLER;
+	signed char garray[3][3] = YAMAHA_GSENSOR_TRANSFORMATION_KEPLER;
+#else
 	signed char marray[3][3] = YAMAHA_MSENSOR_TRANSFORMATION;
 	signed char garray[3][3] = YAMAHA_GSENSOR_TRANSFORMATION;
 	signed char marray_emul[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_EMUL;
 	signed char garray_emul[3][3] = YAMAHA_GSENSOR_TRANSFORMATION_EMUL;
-	signed char marray_00[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_00;
+        signed char marray_00[3][3] = YAMAHA_MSENSOR_TRANSFORMATION_00;
+#endif
 
 	switch (cmd) {
 		case YAMAHA_IOCTL_GET_MARRAY:
+
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) ||defined(CONFIG_S5PC110_FLEMING_BOARD)
+				if(!(HWREV == 0x08 || HWREV == 0x04 || HWREV == 0x0C || HWREV == 0x02 || HWREV == 0x0A))  // 
+				{
+					if (copy_to_user((void *)arg, marray_B5, sizeof(marray_B5))) 
+					{
+						printk("YAMAHA_GSENSOR_TRANSFORMATION_EMUL copy failed\n");
+						return -EFAULT;
+					}
+
+				}
+				else
+				{
+				if (copy_to_user((void *)arg, marray, sizeof(marray))) 
+				{
+					printk("YAMAHA_GSENSOR_TRANSFORMATION_EMUL copy failed\n");
+					return -EFAULT;
+				}
+				}
+			//	printk("YAMAHA_GSENSOR_TRANSFORMATION_EMUL copy\n");
+#elif  defined(CONFIG_S5PC110_T959_BOARD)
+
+				if (copy_to_user((void *)arg, marray, sizeof(marray))) 
+				{
+					printk("YAMAHA_GSENSOR_TRANSFORMATION_EMUL copy failed\n");
+					return -EFAULT;
+				}
+
+
+#else			
                      if(HWREV>=0xb)
-                     {
+			{
 				if (copy_to_user((void *)arg, marray, sizeof(marray))) 
 				{
 					printk("YAMAHA_MSENSOR_TRANSFORMATION copy failed\n");
 					return -EFAULT;
 				}
-                     }
+			}
 			else if((HWREV%2) ||(HWREV>=0xa))
 			{
 				if (copy_to_user((void *)arg, marray_00, sizeof(marray))) 
@@ -98,8 +168,18 @@ yamaha_ioctl(struct inode *inode, struct file *file,
 					return -EFAULT;
 				}
 			}
+#endif 
 			break;
 		case YAMAHA_IOCTL_GET_GARRAY:
+			
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD) || defined(CONFIG_S5PC110_T959_BOARD)
+			if (copy_to_user((void *)arg, garray, sizeof(garray))) 
+			{
+				printk("YAMAHA_GSENSOR_TRANSFORMATION copy failed\n");
+				return -EFAULT;
+			}
+			
+#else			
 			if((HWREV%2) ||(HWREV>=0xa))
 			{
 				if (copy_to_user((void *)arg, garray, sizeof(garray))) 
@@ -116,7 +196,7 @@ yamaha_ioctl(struct inode *inode, struct file *file,
 					return -EFAULT;
 				}
 			}
-
+#endif
 			break;
 		default:
 			return -ENOTTY;

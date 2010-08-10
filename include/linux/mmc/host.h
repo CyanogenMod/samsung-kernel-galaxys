@@ -132,6 +132,9 @@ struct mmc_host {
 
 	/* private data */
 	spinlock_t		lock;		/* lock for claim and bus ops */
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+       struct mutex            carddetect_lock;
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
 
 	struct mmc_ios		ios;		/* current io bus settings */
 	u32			ocr;		/* the current OCR setting */

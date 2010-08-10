@@ -10,6 +10,19 @@
  */
 
 #include <linux/scatterlist.h>
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#include <mach/gpio.h>
+#include <plat/gpio-cfg.h>
+#include <linux/regulator/max8998.h>
+#include <mach/max8998_function.h>
+
+#define SDCARD_POWER 5
+
+   static struct work_struct LDO5_enable_work;
+   static struct work_struct LDO5_disable_work;
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
 
 /*
  * Controller registers
@@ -304,6 +317,13 @@ static inline void *sdhci_priv(struct sdhci_host *host)
 
 extern int sdhci_add_host(struct sdhci_host *host);
 extern void sdhci_remove_host(struct sdhci_host *host, int dead);
+
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+static void sdhci_LDO5_enable_work(struct work_struct *work);
+static void sdhci_LDO5_disable_work(struct work_struct *work);
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
 
 #ifdef CONFIG_PM
 extern int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state);

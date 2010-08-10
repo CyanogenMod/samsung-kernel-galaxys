@@ -75,8 +75,12 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 		array_size = lowmem_minfree_size;
 
 	for(i = 0; i < array_size; i++) {
+#if 1	// yjjung_20100524, compare the sum of free+file with lowmem_minfree 
+		if (other_free + other_file < lowmem_minfree[i])
+#else 
 		if (other_free < lowmem_minfree[i] && 
 			other_file < lowmem_minfree[i])
+#endif 
 		{
 			min_adj = lowmem_adj[i];
 			break;

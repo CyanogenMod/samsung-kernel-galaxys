@@ -38,6 +38,7 @@
 #include <plat/regs-clock.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <mach/sec_jack.h>
 
 #include "s5p_tv.h"
 
@@ -372,6 +373,7 @@ static int __devinit tv_clk_get(struct platform_device *pdev, struct _s5p_tv_sta
 static int s5p_tv_v_open(struct file *file)
 {
 	int ret = 0,err;
+	unsigned int status;
 	ref_count_tv ++ ;
 	mutex_lock(mutex_for_fo);
 
@@ -389,6 +391,8 @@ static int s5p_tv_v_open(struct file *file)
 	
 #ifdef CONFIG_CPU_S5PC110
 
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)//Kepler
+
 	err = gpio_request(S5PC11X_GPJ4(4),"TV_EN");
 	udelay(50);
 	gpio_direction_output(S5PC11X_GPJ4(4),1);
@@ -400,6 +404,32 @@ static int s5p_tv_v_open(struct file *file)
 	gpio_direction_output(S5PC11X_GPJ2(6),0);
 	gpio_set_value(S5PC11X_GPJ2(6),0);
 	udelay(50);
+
+#elif (defined CONFIG_S5PC110_T959_BOARD)//T959
+	status=get_headset_status();
+	printk("s5p_tv_v_open: get_headset_status:%d\n",status);
+	
+	if((SEC_HEADSET_3_POLE_DEVICE==status)||(SEC_TVOUT_DEVICE==status))
+	{
+		printk("EAR_SEL:Low\n");
+		err = gpio_request(S5PC11X_GPJ2(6),"EAR_SEL"); //GPIO_EARPATH_SEL
+		udelay(50);
+		gpio_direction_output(S5PC11X_GPJ2(6),0);
+		gpio_set_value(S5PC11X_GPJ2(6),0);
+		udelay(50);
+	}
+	else if(SEC_HEADSET_4_POLE_DEVICE==status)
+	{
+		printk("EAR_SEL:High\n");
+		err = gpio_request(S5PC11X_GPJ2(6),"EAR_SEL"); //GPIO_EARPATH_SEL
+		udelay(50);
+		gpio_direction_output(S5PC11X_GPJ2(6),0);
+		gpio_set_value(S5PC11X_GPJ2(6),1);
+		udelay(50);
+	}
+
+#endif
+
 #endif
 
 	_s5p_tv_if_init_param();

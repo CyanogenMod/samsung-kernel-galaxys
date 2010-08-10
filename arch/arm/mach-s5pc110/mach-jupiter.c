@@ -38,6 +38,7 @@
 
 #include <media/ce147_platform.h>
 #include <media/s5ka3dfx_platform.h>
+#include <media/isx005_platform.h> 
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -889,6 +890,21 @@ static struct platform_device s3c_device_i2c12 = {
 	.id					= 12,
 	.dev.platform_data	= &i2c12_platdata,
 };
+//[ hdlnc_bp_ytkwon : 20100301
+static	struct	i2c_gpio_platform_data	i2c13_platdata = {
+	.sda_pin		= GPIO_A1026_SDA,
+	.scl_pin		= GPIO_A1026_SCL,
+	.udelay			= 1,	/* 250KHz */		
+	.sda_is_open_drain	= 0,
+	.scl_is_open_drain	= 0,
+	.scl_is_output_only	= 0,
+};
+static struct platform_device s3c_device_i2c13 = {
+	.name				= "i2c-gpio",
+	.id					= 13,
+	.dev.platform_data	= &i2c13_platdata,
+};
+//] hdlnc_bp_ytkwon : 20100301
 
 static struct platform_device opt_gp2a = {
 	.name = "gp2a-opt",
@@ -910,8 +926,23 @@ static struct sec_jack_port sec_jack_port[] = {
 			.eint		= IRQ_EINT(30),
 			.gpio		= GPIO_EAR_SEND_END, 
 			.gpio_af	= GPIO_EAR_SEND_END_AF, 
-			.low_active	= 1
+
+			#ifdef CONFIG_KEPLER_AUDIO_A1026
+			.low_active	= 0 // hdlnc_bp_ytkwon : 20100301
+			#else
+			.low_active	= 1 // hdlnc_bp_ytkwon : 20100301
+			#endif
+//[ hdlnc_bp_ytkwon : 20100310
+		},			
+		{ // SEND/END info
+			.eint		= IRQ_EINT(18),
+			.gpio		= GPIO_EAR_SEND_END35, 
+			.gpio_af	= GPIO_EAR_SEND_END35_AF, 
+			
+			.low_active	= 1 // hdlnc_bp_ytkwon : 20100301
 		}			
+//] hdlnc_bp_ytkwon : 20100310
+
         }
 };
 
@@ -935,6 +966,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_rtc,
 #endif
 	&s3c_device_keypad,	
+	&s3c_device_adc,	// [[junghyunseok edit for phone reset issue solution 20100504(position change)
 	&s3c_device_8998consumer,
 	&s3c_device_fb,
 	&s3c_device_mfc,
@@ -992,7 +1024,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_qtts,
 #endif
     &s5p_trs_detect, //mkh
-	&s3c_device_adc,
+//	&s3c_device_adc,	// [[junghyunseok edit for phone reset issue solution 20100504(position change)
 	&s3c_device_cfcon,
 	&s5p_device_tvout,
 	&s3c_device_fimc0,
@@ -1019,6 +1051,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_i2c10,
        &s3c_device_i2c11,
        &s3c_device_i2c12,
+       &s3c_device_i2c13,  // hdlnc_bp_ytkwon : 20100301
 	&opt_gp2a,
 #endif
     &s3c_device_tsi,
@@ -2098,6 +2131,296 @@ static struct s3c_platform_camera s5ka3dfx = {
 };
 #endif
 
+#ifdef CONFIG_VIDEO_ISX005
+
+/**
+ * isx005_ldo_en()
+ * camera에 전원을 공급하기 위한 LDO들을 켠다.
+ *
+ * @param     en             LDO enable 여부
+ * @return    void
+ * @remark    Function     Set_MAX8998_PM_OUTPUT_Voltage, Set_MAX8998_PM_REG, 
+ *
+ * Dec 07, 2009  initial revision
+ */
+static void isx005_ldo_en(bool en)
+{
+	printk("<MACHINE> isx005_ldo_en\n", en);
+
+	if(en){
+			
+		/* Turn CAM_SOC_CORE_1.2V on */
+		Set_MAX8998_PM_OUTPUT_Voltage(LDO14, VCC_1p200);
+		Set_MAX8998_PM_REG(ELDO14, 1);
+		udelay(50);
+
+		/* Turn CAM_SOC_IO_2.8V on */
+		Set_MAX8998_PM_OUTPUT_Voltage(LDO15, VCC_2p800);
+		Set_MAX8998_PM_REG(ELDO15, 1);
+//cam-i2c		s3c_i2c0_cfg_gpio_pull_none();		
+		udelay(50);
+
+		/* Turn CAM_SOC_A2.7V on */		
+		Set_MAX8998_PM_OUTPUT_Voltage(LDO13, VCC_2p700);
+		Set_MAX8998_PM_REG(ELDO13, 1);
+		udelay(50);
+
+		/* Turn CAM_AF_3.0V on */	
+		Set_MAX8998_PM_OUTPUT_Voltage(LDO11, VCC_3p000);
+		Set_MAX8998_PM_REG(ELDO11, 1);
+	} else {
+//cam-i2c		s3c_i2c0_cfg_gpio_pull_up();
+//cam-i2c		mdelay(50);
+		Set_MAX8998_PM_REG(ELDO15, 0);
+		Set_MAX8998_PM_REG(ELDO13, 0);
+		Set_MAX8998_PM_REG(ELDO11, 0);
+		udelay(50);		
+		Set_MAX8998_PM_REG(ELDO14, 0);
+	}
+}
+/**
+ * isx005_cam_stdby()
+ * camera를 enable 한다.
+ *
+ * @param     en             enable 여부
+ * @return    err              gpio 제어에 실패한 경우 err를 반환한다.
+ * @remark    Function     gpio_request, gpio_direction_output, gpio_set_value, msleep, gpio_free
+ *
+ * Dec 07, 2009  initial revision
+ */
+ 
+//static int isx005_cam_stdby(bool en)
+int isx005_cam_stdby(bool en)
+{
+	int err;
+
+	printk("<MACHINE> stdby\n", en);
+
+	/* CAM_MEGA_EN - GPJ0(6) */
+	err = gpio_request(S5PC11X_GPJ0(6), "GPJ0");
+	if (err)
+	{
+		printk(KERN_ERR "failed to request GPJ0 for camera control\n");
+		return err;
+	}
+
+	gpio_direction_output(S5PC11X_GPJ0(6), 0);
+	msleep(1);
+	gpio_direction_output(S5PC11X_GPJ0(6), 1);
+	msleep(1);
+
+	if(en)
+	{
+		gpio_set_value(S5PC11X_GPJ0(6), 1);
+	} 
+	else 
+	{
+		gpio_set_value(S5PC11X_GPJ0(6), 0); 
+	}
+	msleep(1);
+
+	gpio_free(S5PC11X_GPJ0(6));
+
+	return 0;
+}
+/**
+ * isx005_cam_nrst()
+ * camera를 reset 한다.
+ *
+ * @param     nrst             reset 여부
+ * @return    err              gpio 제어에 실패한 경우 err를 반환한다.
+ * @remark    Function     gpio_request, gpio_direction_output, gpio_set_value, msleep, gpio_free
+ *
+ * Dec 07, 2009  initial revision
+ */
+static int isx005_cam_nrst(bool nrst)
+{
+	int err;
+
+	printk(" isx005_cam_nrst\n", nrst);
+
+	/* CAM_MEGA_nRST - GPJ1(5)*/
+	err = gpio_request(S5PC11X_GPJ1(5), "GPJ1");
+	if (err) 
+	{
+		printk(KERN_ERR "failed to request GPJ1 for camera control\n");
+		return err;
+	}
+
+	gpio_direction_output(S5PC11X_GPJ1(5), 0);
+	msleep(1);
+	gpio_direction_output(S5PC11X_GPJ1(5), 1);
+	msleep(1);
+
+	//gpio_set_value(S5PC11X_GPJ1(5), 0);
+	
+	msleep(1);
+
+	if (nrst)
+	{
+		gpio_set_value(S5PC11X_GPJ1(5), 1);
+		msleep(1);
+	}
+	else
+	{
+		gpio_set_value(S5PC11X_GPJ1(5), 0);	
+		msleep(1);
+
+	}
+	
+	gpio_free(S5PC11X_GPJ1(5));
+
+	return 0;
+}
+/**
+ * isx005_cam_nrst()
+ * camera를 사용가능한 상태로 설정한다.
+ *
+ * @param     en             enable 여부
+ * @return    err              gpio 제어에 실패한 경우 err를 반환한다.
+ * @remark    Function     isx005_setup_port, isx005_ldo_en, s3c_gpio_cfgpin,
+ *                                   isx005_cam_stdby, isx005_cam_nrst
+ *
+ * Dec 07, 2009  initial revision
+ */
+static int isx005_power_on(bool en)
+{
+	int err;
+
+	isx005_ldo_en(en);
+
+	msleep(5);
+
+//	isx005_cam_stdby(en);
+//	msleep(10);	
+	
+	s3c_gpio_cfgpin(S5PC11X_GPE1(3), S5PC11X_GPE1_3_CAM_A_CLKOUT * en);
+
+	msleep(10);
+
+	isx005_cam_nrst(en);
+
+	msleep(15);// 10 -> 15  because of i2c fail
+
+	return 0;
+	}
+
+static int isx005_power_off(void)
+{
+	int err;
+
+	printk(KERN_ERR "isx005_power_off\n");
+
+	/* CAM_MEGA_nRST - GPJ1(5) */
+	err = gpio_request(GPIO_CAM_MEGA_nRST, "GPJ1");
+	
+	if(err) {
+		printk(KERN_ERR "failed to request GPJ1 for camera control\n");
+	
+		return err;
+	}
+
+	/* CAM_MEGA_EN - GPJ0(6) */
+	err = gpio_request(GPIO_CAM_MEGA_EN, "GPJ0");
+
+	if(err) {
+		printk(KERN_ERR "failed to request GPJ0 for camera control\n");
+	
+		return err;
+	}
+
+	// CAM_MEGA_EN - GPJ0(6) LOW
+	gpio_direction_output(GPIO_CAM_MEGA_EN, 1);
+	
+	gpio_set_value(GPIO_CAM_MEGA_EN, 0);
+	
+	mdelay(200);	
+
+	// CAM_MEGA_nRST - GPJ1(5) LOW
+	gpio_direction_output(GPIO_CAM_MEGA_nRST, 1);
+	
+	gpio_set_value(GPIO_CAM_MEGA_nRST, 0);
+	
+	mdelay(1);
+
+	// Mclk disable
+	s3c_gpio_cfgpin(GPIO_CAM_MCLK, 0);
+
+	mdelay(1);
+
+	isx005_ldo_en(FALSE);
+
+	mdelay(1);
+	
+	gpio_free(GPIO_CAM_MEGA_nRST);
+	gpio_free(GPIO_CAM_MEGA_EN);
+	
+	msleep(10);
+	msleep(200);	
+	msleep(200);		
+	msleep(100);//when power off, add delay time (500ms)
+
+	return 0;
+}
+
+
+static int isx005_power_en(int onoff)
+{
+	if(onoff){
+		isx005_power_on(TRUE);
+	} else {
+		isx005_power_off();
+	}
+
+	return 0;
+}
+
+static struct isx005_platform_data isx005_plat = {
+	.default_width = 800,
+	.default_height = 480,
+	.pixelformat = V4L2_PIX_FMT_UYVY,
+	.freq = 24000000,
+	.is_mipi = 0,
+};
+
+static struct i2c_board_info  isx005_i2c_info = {
+//	I2C_BOARD_INFO("ISX005", 0x78 >> 1),
+// I2C_BOARD_INFO("ISX005", 0x1A >> 1),
+I2C_BOARD_INFO("ISX005", 0x1A ),
+	.platform_data = &isx005_plat,
+};
+
+static struct s3c_platform_camera isx005 = {
+	.id = CAMERA_PAR_A,
+	.type = CAM_TYPE_ITU,
+	.fmt = ITU_601_YCBCR422_8BIT,
+	.order422 = CAM_ORDER422_8BIT_CBYCRY,
+	.i2c_busnum = 0,
+	.info = &isx005_i2c_info,
+	.pixelformat = V4L2_PIX_FMT_UYVY,
+	.srclk_name = "srclk",
+	.clk_name = "sclk_cam0",
+	.clk_rate = 24000000,
+	.line_length = 1536,
+	.width = 640,
+	.height = 480,
+	.window = {
+		.left 	= 0,
+		.top = 0,
+		.width = 640,
+		.height = 480,
+	},
+
+	/* Polarity */
+	.inv_pclk = 0,
+	.inv_vsync = 1,
+	.inv_href = 0,
+	.inv_hsync = 0,
+	.initialized = 0,
+	.cam_power = isx005_power_en,
+};
+
+#endif /* CONFIG_VIDEO_ISX005 */
 
 /* Interface setting */
 static struct s3c_platform_fimc __initdata fimc_plat = {
@@ -2112,6 +2435,9 @@ static struct s3c_platform_fimc __initdata fimc_plat = {
 #ifdef CONFIG_VIDEO_S5KA3DFX
 		&s5ka3dfx,
 #endif
+#ifdef CONFIG_VIDEO_ISX005
+		&isx005,
+#endif
 	},
 	.hw_ver			= 0x43,
 };
@@ -2121,16 +2447,16 @@ static int arise_notifier_call(struct notifier_block *this, unsigned long code, 
 
 	int mode = REBOOT_MODE_NONE;
 
-	if ((code == SYS_RESTART) && _cmd) {
-		if (!strcmp((char *)_cmd, "arm11_fota"))
-			mode = REBOOT_MODE_ARM11_FOTA;
-		else if (!strcmp((char *)_cmd, "arm9_fota"))
-			mode = REBOOT_MODE_ARM9_FOTA;
-		else if (!strcmp((char *)_cmd, "recovery")) 
-			mode = REBOOT_MODE_RECOVERY;
-		else if (!strcmp((char *)_cmd, "download")) 
-			mode = REBOOT_MODE_DOWNLOAD;
-	}
+		if ((code == SYS_RESTART) && _cmd) {
+			if (!strcmp((char *)_cmd, "arm11_fota"))
+				mode = REBOOT_MODE_ARM11_FOTA;
+			else if (!strcmp((char *)_cmd, "arm9_fota"))
+				mode = REBOOT_MODE_ARM9_FOTA;
+			else if (!strcmp((char *)_cmd, "recovery")) 
+				mode = REBOOT_MODE_RECOVERY;
+			else if (!strcmp((char *)_cmd, "download")) 
+				mode = REBOOT_MODE_DOWNLOAD;
+		}
 
 	if(code != SYS_POWER_OFF) {
 		if(sec_set_param_value)	{
@@ -3102,10 +3428,17 @@ static unsigned int jupiter_sleep_gpio_table[][3] = {
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_NONE}, 
 	{S5PC11X_GPA0(3),
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
+#ifdef CONFIG_S5PC110_T959_BOARD			  
+	{S5PC11X_GPA0(4), 
+			  S3C_GPIO_SLP_PREV, S3C_GPIO_PULL_UP}, 
+	{S5PC11X_GPA0(5),
+			  S3C_GPIO_SLP_PREV, S3C_GPIO_PULL_UP}, 
+#else			  
 	{S5PC11X_GPA0(4), 
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_NONE}, 
 	{S5PC11X_GPA0(5),
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
+#endif			  
 	{S5PC11X_GPA0(6), 
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_NONE}, 
 	{S5PC11X_GPA0(7),
@@ -3357,11 +3690,17 @@ static unsigned int jupiter_sleep_gpio_table[][3] = {
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
         {S5PC11X_GPG2(6), 
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
-
-	{S5PC11X_GPG3(0), 
+#ifdef CONFIG_S5PC110_T959_BOARD
+        {S5PC11X_GPG3(0), 
+			  S3C_GPIO_SLP_PREV, S3C_GPIO_PULL_UP}, 
+        {S5PC11X_GPG3(1), 
+			  S3C_GPIO_SLP_PREV, S3C_GPIO_PULL_UP}, 
+#else
+        {S5PC11X_GPG3(0), 
 			  S3C_GPIO_SLP_OUT1, S3C_GPIO_PULL_NONE}, 
         {S5PC11X_GPG3(1), 
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
+#endif
 #if defined CONFIG_ARIES_VER_B0 || defined CONFIG_ARIES_VER_B1|| defined CONFIG_ARIES_VER_B2 || (defined CONFIG_ARIES_VER_B3)		  
         {S5PC11X_GPG3(2), 
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_DOWN},
@@ -3626,11 +3965,19 @@ static unsigned int jupiter_sleep_gpio_table[][3] = {
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_DOWN}, 
         {S5PC11X_MP04(3), 
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
+//[hdlnc_bp_ldj : 20100308
+#ifdef CONFIG_KEPLER_AUDIO_A1026
+        {S5PC11X_MP04(4), 
+			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_NONE}, 
+
+#else
         {S5PC11X_MP04(4), 
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_DOWN}, 
+#endif	
+		  
 #if defined CONFIG_ARIES_VER_B0 || defined CONFIG_ARIES_VER_B1|| defined CONFIG_ARIES_VER_B2 || (defined CONFIG_ARIES_VER_B3)				  
         {S5PC11X_MP04(5), 
-			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_DOWN}, 
+			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_NONE}, 
 #else
 		{S5PC11X_MP04(5), 
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
@@ -3638,6 +3985,7 @@ static unsigned int jupiter_sleep_gpio_table[][3] = {
         {S5PC11X_MP04(6), 
 			  //S3C_GPIO_SLP_OUT1, S3C_GPIO_PULL_NONE}, 
 			  S3C_GPIO_SLP_OUT0, S3C_GPIO_PULL_NONE}, 
+//]hdlnc_bp_ldj : 20100308			  
 #if defined CONFIG_ARIES_VER_B0 || defined CONFIG_ARIES_VER_B1|| defined CONFIG_ARIES_VER_B2 || (defined CONFIG_ARIES_VER_B3)			  
         {S5PC11X_MP04(7), 
 			  S3C_GPIO_SLP_INPUT, S3C_GPIO_PULL_DOWN}, 
@@ -3782,17 +4130,22 @@ void s3c_config_sleep_gpio(void)
 	s3c_gpio_cfgpin(S5PC11X_GPH0(5), S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(S5PC11X_GPH0(5), S3C_GPIO_PULL_NONE);
 	s3c_gpio_setpin(S5PC11X_GPH0(5), 0);
-
+//[hdlnc_bp_ytkwon : 20100326
 #if 0 //det_3.5
 	s3c_gpio_cfgpin(S5PC11X_GPH0(6), S3C_GPIO_INPUT);
-	s3c_gpio_setpull(S5PC11X_GPH0(6), S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(S5PC11X_GPH0(6), S3C_GPIO_PULL_UP);
+
 	//s3c_gpio_setpin(S5PC11X_GPH0(6), 0);
 #endif
-	
+
+//]hdlnc_bp_ldj : 20100308
+
 	//s3c_gpio_cfgpin(S5PC11X_GPH0(7), S3C_GPIO_INPUT);
 	//s3c_gpio_setpull(S5PC11X_GPH0(7), S3C_GPIO_PULL_NONE);
 	//s3c_gpio_setpin(S5PC11X_GPH0(0), 0);
-
+	//[hdlnc_bp_ldj : 20100305
+#ifdef CONFIG_KEPLER_AUDIO_A1026	
+/*
 	s3c_gpio_cfgpin(S5PC11X_GPH1(0), S3C_GPIO_INPUT);
 	s3c_gpio_setpull(S5PC11X_GPH1(0), S3C_GPIO_PULL_DOWN);
 	//s3c_gpio_setpin(S5PC11X_GPH1(1), 0);
@@ -3803,7 +4156,22 @@ void s3c_config_sleep_gpio(void)
 	//
 	s3c_gpio_cfgpin(S5PC11X_GPH1(2), S3C_GPIO_INPUT);
 	s3c_gpio_setpull(S5PC11X_GPH1(2), S3C_GPIO_PULL_DOWN);
+	//s3c_gpio_setpin(S5PC11X_GPH1(2), 0);	
+*/	
+#else
+	s3c_gpio_cfgpin(S5PC11X_GPH1(0), S3C_GPIO_INPUT);
+	s3c_gpio_setpull(S5PC11X_GPH1(0), S3C_GPIO_PULL_DOWN);
+	//s3c_gpio_setpin(S5PC11X_GPH1(1), 0);
+
+	s3c_gpio_cfgpin(S5PC11X_GPH1(1), S3C_GPIO_INPUT);
+	s3c_gpio_setpull(S5PC11X_GPH1(1), S3C_GPIO_PULL_DOWN);
+	//s3c_gpio_setpin(S5PC11X_GPH1(1), 0);
+
+	//]hdlnc_bp_ldj : 20100305
+	s3c_gpio_cfgpin(S5PC11X_GPH1(2), S3C_GPIO_INPUT);
+	s3c_gpio_setpull(S5PC11X_GPH1(2), S3C_GPIO_PULL_DOWN);
 	//s3c_gpio_setpin(S5PC11X_GPH1(2), 0);
+#endif	//CONFIG_KEPLER_AUDIO_A1026	
 
 #if 0	// kt.hur on 100104
 	s3c_gpio_cfgpin(S5PC11X_GPH1(3), S3C_GPIO_INPUT);
@@ -3823,8 +4191,8 @@ void s3c_config_sleep_gpio(void)
 	s3c_gpio_setpull(S5PC11X_GPH1(6), S3C_GPIO_PULL_NONE);
 	//s3c_gpio_setpin(S5PC11X_GPH1(6), 0);
 
-	s3c_gpio_cfgpin(S5PC11X_GPH1(7), S3C_GPIO_INPUT);
-	s3c_gpio_setpull(S5PC11X_GPH1(7), S3C_GPIO_PULL_NONE);
+	//s3c_gpio_cfgpin(S5PC11X_GPH1(7), S3C_GPIO_INPUT);
+	//s3c_gpio_setpull(S5PC11X_GPH1(7), S3C_GPIO_PULL_NONE);
 	//s3c_gpio_setpin(S5PC11X_GPH1(7), 0);
 
 
@@ -3836,9 +4204,9 @@ void s3c_config_sleep_gpio(void)
 	s3c_gpio_setpull(S5PC11X_GPH2(1), S3C_GPIO_PULL_NONE);
 	s3c_gpio_setpin(S5PC11X_GPH2(1), 0);
 
-	s3c_gpio_cfgpin(S5PC11X_GPH2(2), S3C_GPIO_OUTPUT);
-	s3c_gpio_setpull(S5PC11X_GPH2(2), S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpin(S5PC11X_GPH2(2), 0);
+	//s3c_gpio_cfgpin(S5PC11X_GPH2(2), S3C_GPIO_OUTPUT);
+	//s3c_gpio_setpull(S5PC11X_GPH2(2), S3C_GPIO_PULL_NONE);
+	//s3c_gpio_setpin(S5PC11X_GPH2(2), 0);
 
 	s3c_gpio_cfgpin(S5PC11X_GPH2(3), S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(S5PC11X_GPH2(3), S3C_GPIO_PULL_NONE);
@@ -4041,8 +4409,13 @@ static void __init smdkc110_machine_init(void)
 	msleep(100);
 }
 
-
+#if defined CONFIG_S5PC110_KEPLER_BOARD
+MACHINE_START(SMDKC110, "SGH-I897")
+#elif defined CONFIG_S5PC110_T959_BOARD
+MACHINE_START(SMDKC110, "SGH-T959")
+#else
 MACHINE_START(SMDKC110, "GT-I9000")
+#endif
 	/* Maintainer: Ben Dooks <ben@fluff.org> */
 	.phys_io	= S3C_PA_UART & 0xfff00000,
 	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,

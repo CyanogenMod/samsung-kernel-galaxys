@@ -51,6 +51,19 @@ static u32 get_curclk(u32 ctrl2)
 	return ctrl2;
 }
 
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+static void sdhci_LDO5_enable_work(struct work_struct *work)
+{
+	max8998_ldo_enable_direct(SDCARD_POWER);
+}
+static void sdhci_LDO5_disable_work(struct work_struct *work)
+{
+	max8998_ldo_disable_direct(SDCARD_POWER);
+}
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
+
 static void sdhci_s3c_check_sclk(struct sdhci_host *host)
 {
 	struct sdhci_s3c *ourhost = to_s3c(host);
@@ -238,9 +251,27 @@ irqreturn_t sdhci_irq_cd (int irq, void *dev_id)
 	if (detect) {
 		printk(KERN_DEBUG "sdhci: card inserted.\n");
 		sc->host->flags |= SDHCI_DEVICE_ALIVE;
+
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+		if(!gpio_get_value(GPIO_T_FLASH_DETECT)){
+			schedule_work(&LDO5_enable_work);
+		}
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
+
 	} else {
 		printk(KERN_DEBUG "sdhci: card removed.\n");
 		sc->host->flags &= ~SDHCI_DEVICE_ALIVE;
+		
+#if defined CONFIG_S5PC110_T959_BOARD		
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card	
+		if(gpio_get_value(GPIO_T_FLASH_DETECT)){
+			schedule_work(&LDO5_disable_work);
+		}
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
+
 	}
 	tasklet_schedule(&sc->host->card_tasklet);
 
@@ -391,6 +422,19 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
 		if(ret)
 			goto err_add_host;
 	}
+	
+#if defined CONFIG_S5PC110_T959_BOARD	
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+	INIT_WORK(&LDO5_enable_work, sdhci_LDO5_enable_work);
+	INIT_WORK(&LDO5_disable_work, sdhci_LDO5_disable_work);
+
+	if(!strcmp(mmc_hostname(host->mmc), "mmc2")){
+		if(gpio_get_value(GPIO_T_FLASH_DETECT)){
+			schedule_work(&LDO5_disable_work);
+       		}
+    }
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
 
 	return 0;
 
@@ -467,8 +511,25 @@ static int sdhci_s3c_resume(struct platform_device *dev)
 	struct sdhci_host *host = platform_get_drvdata(dev);
 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
 	int ret;
-
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+		if(!strcmp(mmc_hostname(host->mmc), "mmc2")){
+			if(!gpio_get_value(GPIO_T_FLASH_DETECT)){
+					schedule_work(&LDO5_enable_work);
+			}
+		}	
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
 	sdhci_resume_host(host);
+#if defined CONFIG_S5PC110_T959_BOARD
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+		if(!strcmp(mmc_hostname(host->mmc), "mmc2")){
+			if(gpio_get_value(GPIO_T_FLASH_DETECT)){
+				schedule_work(&LDO5_disable_work);
+			}
+		}
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100506 : for LDO5 2.8V off on use not SD card
+#endif
 
 	if(pdata && pdata->cfg_ext_cd){
 		ret = request_irq(pdata->ext_cd, sdhci_irq_cd, IRQF_SHARED, mmc_hostname(host->mmc), sdhci_priv(host));

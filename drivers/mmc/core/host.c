@@ -81,6 +81,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	device_initialize(&host->class_dev);
 
 	spin_lock_init(&host->lock);
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+	mutex_init(&host->carddetect_lock);
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
 	init_waitqueue_head(&host->wq);
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
 

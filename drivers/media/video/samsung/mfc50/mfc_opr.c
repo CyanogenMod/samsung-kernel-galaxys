@@ -829,7 +829,7 @@ MFC_ERROR_CODE mfc_init_hw()
 
 	
 #if	ENABLE_FW_RELOAD_FOR_TIMEOUT
-		if( READL(0x58) == 0x00)
+		//if( READL(0x58) == 0x00)
 		{
 			if (mfc_load_firmware() < 0)
 			{
@@ -882,14 +882,15 @@ MFC_FW_RESET:
 		 mfc_err("MFCINST_ERR_FW_LOAD_MFC_SW_RESET_FAIL............(Ret = %d)", nIntrRet);
 		 
 #if	ENABLE_PROTECT_INTR_TIMEOUT_ERR
-		 if( READL(0x58) == 0x00)
+		 //if( READL(0x58) == 0x00)
 		{
 			if (mfc_load_firmware() < 0)
 			{
 				mfc_err("MFCINST_ERR_FW_LOAD_FAIL\n");
 				return MFCINST_ERR_FW_LOAD_FAIL;
 			}	
-			else if(nFWLoadCnt == 0)
+			
+			if(nFWLoadCnt == 0)
 			{
 				nFWLoadCnt++;
 				goto MFC_FW_RESET;			
@@ -1617,7 +1618,7 @@ static MFC_ERROR_CODE mfc_decode_one_frame(mfc_inst_ctx *mfc_ctx, mfc_dec_exe_ar
 	{
 		stream_vir = phys_to_virt(dec_arg->in_strm_buf);	
 		nSum = CheckNullStream(stream_vir, dec_arg->in_strm_size);
-		
+			
 		if(nSum != 0)
 		{
 #ifdef	ENABLE_DEBUG_DEC_EXE_INTR_ERR			  		
@@ -1625,27 +1626,27 @@ static MFC_ERROR_CODE mfc_decode_one_frame(mfc_inst_ctx *mfc_ctx, mfc_dec_exe_ar
 			makefile_mfc_dec_err_info(mfc_ctx, dec_arg,500);
 #endif
 #endif			
-			return	MFCINST_ERR_STRM_BUF_INVALID;
-	}	
+			return	MFCINST_ERR_STRM_BUF_INVALID;		
+		}
 	}
 #endif
 	
 	/*		Check H.263 Strat Code	*/
 #if	ENABLE_CHECK_START_CODE
-		stream_vir = phys_to_virt(dec_arg->in_strm_buf);		
+	stream_vir = phys_to_virt(dec_arg->in_strm_buf);
 	nOffSet = CheckDecStartCode(stream_vir, dec_arg->in_strm_size, dec_arg->in_codec_type);
 		
 	if(nOffSet < 0)
-		{
+	{
 #ifdef	ENABLE_DEBUG_DEC_EXE_INTR_ERR			  		
  #if	ENABLE_DEBUG_DEC_EXE_INTR_ERR
 		makefile_mfc_dec_err_info(mfc_ctx, dec_arg,400);
 #endif
 #endif
-			return	MFCINST_ERR_STRM_BUF_INVALID;			
-		}	
+		return 	MFCINST_ERR_STRM_BUF_INVALID;
+	}
 #endif	
-
+	
 	count++;
 	mfc_debug_L0("++ IntNo%d(%d)\r\n", mfc_ctx->InstNo, count);
 
@@ -2138,6 +2139,12 @@ static MFC_ERROR_CODE mfc_alloc_context_buffer(mfc_inst_ctx *mfc_ctx, unsigned i
 	if (ret_code < 0)
 		return ret_code;
 
+       /*	Set mfc context to "0". */ 
+  	unsigned char *context_vir;	
+	context_vir = phys_to_virt(local_param.mem_alloc.out_paddr);	
+	memset(context_vir, 0x0, local_param.mem_alloc.buff_size );
+        dmac_clean_range(context_vir, context_vir + local_param.mem_alloc.buff_size);
+	
 	*context_addr = local_param.mem_alloc.out_paddr;
 
 	return ret_code;
@@ -2514,7 +2521,7 @@ void makefile_mfc_dec_err_info(mfc_inst_ctx *mfc_ctx, mfc_dec_exe_arg_t *dec_arg
 			mIsDangerError = 1;
 			printk_mfc_dec_exe_info(mfc_ctx, dec_arg);		
 		}
-		
+
 		memset(fileName0, 0, 50);
 		memset(fileName1, 0, 50);
 		memset(fileName2, 0, 50);
@@ -2601,13 +2608,13 @@ static int CheckMPEG4StartCode(unsigned char *src_mem, unsigned int remainSize)
     unsigned int 	index = 0;   
 
 	for(index = 0; index < remainSize-3; index++)
-    {
+	{
 		if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && (src_mem[index+2] == 0x01))
 			return index;
 	}
-        
+
 	return -1;
-    }
+}
 
 #if	ENABLE_CHECK_START_CODE
 static int CheckDecStartCode(unsigned char *src_mem, unsigned int nstreamSize, SSBSIP_MFC_CODEC_TYPE nCodecType)
@@ -2624,37 +2631,19 @@ static int CheckDecStartCode(unsigned char *src_mem, unsigned int nstreamSize, S
 	
 	if(nFlag != 0xFF){
 		if(nstreamSize > 3){
-			if(nstreamSize > isearchSize)	{
-				if(nCodecType != H264_DEC)
-				{
+			if(nstreamSize > isearchSize)	
+			{
 					for(index = 0; index < isearchSize-3; index++)	{		
 						if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && ((src_mem[index+2] >> nShift) == nFlag))				
-    return index;
-}
-				}
-				else
-				{
-					for(index = 0; index < isearchSize-4; index++)	{		
-						if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && (src_mem[index+2] == 0x00) && ((src_mem[index+3] >> nShift) == nFlag))				
 							return index;
-					}						
-				}
+					}							
 			}
 			else
 			{
-				if(nCodecType != H264_DEC){				
-					for(index = 0; index < nstreamSize - 3; index++)	{		
-						if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && ((src_mem[index+2] >> nShift) == nFlag))				
-							return index;
-					}	
-				}
-				else
-				{
-					for(index = 0; index < isearchSize-4; index++)	{		
-						if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && (src_mem[index+2] == 0x00) && ((src_mem[index+3] >> nShift) == nFlag))				
-							return index;
-					}					
-				}
+				for(index = 0; index < nstreamSize - 3; index++)	{		
+					if((src_mem[index] == 0x00) && (src_mem[index+1] == 0x00) && ((src_mem[index+2] >> nShift) == nFlag))				
+						return index;
+				}	
 			}
 		}
 		else
@@ -2670,7 +2659,7 @@ static int CheckDecStartCode(unsigned char *src_mem, unsigned int nstreamSize, S
 #if	ENABLE_CHECK_NULL_STREAM
 static int CheckNullStream(unsigned char *src_mem, unsigned int streamSize)
 {
-	unsigned int 	temp = 0;
+	unsigned int temp = 0;
 	unsigned int	nn;
 	
     if(streamSize < 30)    

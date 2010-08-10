@@ -325,8 +325,8 @@ static BOOLEAN _i2c_read_( UINT8 SlaveAddr, UINT8 *pData, UINT8 cLength)
 			EXT_I2C_SEND_ACK(EXT_I2C_DELAY);
 			udelay(60);
 			pData++;
-			TKEY_I2C_SCL_SET_INPUT();
 			TKEY_I2C_SDA_SET_INPUT();
+			TKEY_I2C_SCL_SET_INPUT();
 			//while(!gpio_get_value(_3_TOUCH_SCL_28V));
 			delay_count = 100000;
 			while(delay_count--)
@@ -471,24 +471,40 @@ void melfas_send_download_enable_command(void)
 //		.c file included at next must not be inserted to Souce project.
 //		Just #include One file. !!
 //
-//update string "eclair/vendor/samsung/apps/Lcdtest/src/com/sec/android/app/lcdtest/touch_firmware.java"
-//#define FILE_PATH "/system/etc/melfas/MELFAS_FIRM.bin"
 //============================================================
 //#include "MCS5080_SAMPLE_FIRMWARE_R01_V00_bin.c"
 //#include "MMH_SVESTA_R00_V02_bin.c"  //1 include bin file
 //#include "VTW0008_R04_V03_bin.c"  //1 include bin file
-//#include "VTW0008_R04_V06_bin.c"
-#include "VTW0008_R04_V09_bin.c"
+#ifdef CONFIG_S5PC110_KEPLER_BOARD 
+extern unsigned int HWREV;
+
+#include "VTW0014_R00_V14_bin.c"
+#include "VTW0014_R00_V15_bin.c"
+#elif CONFIG_S5PC110_T959_BOARD
+extern unsigned int HWREV;
+#include "MMH_ST959_R01_V07_bin.c"
+#include "VTW0008_R04_V03_bin.c"
+#else
+#include "VTW0008_R04_V06_bin.c"
+#endif 
 //============================================================
 //
 //	main Download furnction
 //
 //============================================================
 #define IRQ_TOUCH_INT S3C_GPIOINT(J4,1)
-void get_touchkey_firmware(char * version)
+int get_touchkey_firmware(char * version)
 {
 
-	_i2c_read_(TOUCHKEY_ADDRESS, version, 3 );
+	int retry=3;
+	while(retry--)
+	{
+	if(_i2c_read_(TOUCHKEY_ADDRESS, version, 3))
+		return 0;
+	
+	}
+	return (-1);
+
 	//printk("%s F/W version: 0x%x, Module version:0x%x\n",__FUNCTION__, version[1],version[2]);
 }
 
@@ -517,7 +533,21 @@ int mcsdl_download_binary_data(void)
 	//------------------------
 	// Run Download
 	//------------------------
+	#ifdef CONFIG_S5PC110_KEPLER_BOARD
+	if(HWREV == 0x08 || HWREV == 0x04 || HWREV == 0x0C || HWREV == 0x02 || HWREV == 0x0A)
+		ret = mcsdl_download( (const UINT8*) MELFAS_binary_v14, (const UINT16)MELFAS_binary_nLength_v14 );
+	else
+		ret = mcsdl_download( (const UINT8*) MELFAS_binary_v15, (const UINT16)MELFAS_binary_nLength_v15 );
+	
+	#elif CONFIG_S5PC110_T959_BOARD
+	if(HWREV < 0x0E )
+		ret = mcsdl_download( (const UINT8*) MELFAS_binary_v03, (const UINT16)MELFAS_binary_nLength_v03 );
+	else if(HWREV == 0x0E)
+		ret = mcsdl_download( (const UINT8*) MELFAS_binary_v07, (const UINT16)MELFAS_binary_nLength_v07 );
+
+	#else
 	ret = mcsdl_download( (const UINT8*) MELFAS_binary, (const UINT16)MELFAS_binary_nLength );
+	#endif
 
 	MELFAS_DISABLE_WATCHDOG_TIMER_RESET();					// Roll-back Baseband touch interrupt ISR.
 	MELFAS_ROLLBACK_WATCHDOG_TIMER_RESET();			// Roll-back Baseband watchdog timer
@@ -543,7 +573,6 @@ int mcsdl_download_binary_data(void)
 	return ( ret == MCSDL_RET_SUCCESS );
 }
 
-//update version "eclair/vendor/samsung/apps/Lcdtest/src/com/sec/android/app/lcdtest/touch_firmware.java"
 
 #define FILE_PATH "/system/etc/melfas/MELFAS_FIRM.bin"
 

@@ -984,6 +984,12 @@ config VIDEO_S5KA3DFX
         ---help---
           This driver supports S5KA3DFX SoC camera module
 
+config VIDEO_ISX005
+        tristate "ISX005 Camera Sensor"
+        depends on I2C && VIDEO_V4L2 && MACH_S5PC110_JUPITER 
+        ---help---
+          This driver supports ISX005 SoC camera module
+
 source "drivers/media/video/samsung/Kconfig"
 
 endif # VIDEO_CAPTURE_DRIVERS

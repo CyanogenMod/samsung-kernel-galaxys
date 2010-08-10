@@ -368,7 +368,7 @@ static int max8998_consumer_probe(struct platform_device *pdev)
                 return PTR_ERR(Reg_Int);
         }
 
-
+	
 	/*initialise the dvs registers*/
 	max8998_set_dvsarm_direct(DVSARM1, dvs_arm_voltage_set[0][1]);
 	max8998_set_dvsarm_direct(DVSARM2, dvs_arm_voltage_set[1][1]);

@@ -35,6 +35,35 @@
  
 #include "s3c-keypad.h"
 
+#ifdef CONFIG_KERNEL_DEBUG_SEC
+#include <linux/kernel_sec_common.h>
+#endif
+
+//NAGSM_Android_SEL_Kernel_Aakash_20100319
+struct class *s3ckeypad_class;
+struct device *s3ckeypad_dev;
+
+
+static int s3ckeypad_evt_enable_status = 1;
+static ssize_t s3ckeypad_evt_status_show(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
+{	
+
+
+	return sprintf(sysfsbuf, "%d\n", s3ckeypad_evt_enable_status);
+
+}
+
+static ssize_t s3ckeypad_evt_status_store(struct device *dev, struct device_attribute *attr,const char *sysfsbuf, size_t size)
+{
+
+	sscanf(sysfsbuf, "%d", &s3ckeypad_evt_enable_status);
+	return size;
+}
+
+static DEVICE_ATTR(s3ckeypadevtcntrl, S_IRUGO | S_IWUSR, s3ckeypad_evt_status_show, s3ckeypad_evt_status_store);
+
+//NAGSM_Android_SEL_Kernel_Aakash_20100319
+
 #define USE_PERF_LEVEL_KEYPAD 1 
 #undef S3C_KEYPAD_DEBUG 
 //#define S3C_KEYPAD_DEBUG 
@@ -133,6 +162,31 @@ static int keypad_scan(void)
 
 #endif
 
+#ifdef CONFIG_KERNEL_DEBUG_SEC	
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)|| defined(CONFIG_T959_VER_B5)
+#define	DUMP_SEQUENCE_COUNT	6
+#if defined(CONFIG_T959_VER_B5)
+#define PRESSED_UP	4
+#define PRESSED_DOWN	5
+#else
+#define PRESSED_UP	5
+#define PRESSED_DOWN	4
+#endif
+
+int forced_dump_sequence[DUMP_SEQUENCE_COUNT] = 
+		{PRESSED_UP, PRESSED_UP, PRESSED_DOWN, PRESSED_UP, PRESSED_DOWN, PRESSED_DOWN};	// dump sequence
+int dump_mode_key_sequence[DUMP_SEQUENCE_COUNT] = {0};	// pressed key sequence
+int dump_mode_key_count = 0;	// count for dump_mode_key_sequence array
+bool is_first_key_down = 0;		// will check dump mode when down key is pressed twice
+int dump_compare_count = 0;		// count for forced_dump_sequence array
+int is_dump_sequence = 0;		// if this is 6, means pressed key sequence is same as dump sequence
+unsigned long long dump_mode_key_pressed_prev=0,dump_mode_key_pressed;
+bool forced_dump_time_limit=0;
+#endif
+#endif
+
+extern unsigned int HWREV;
+
 static void keypad_timer_handler(unsigned long data)
 {
 	u32 press_mask;
@@ -159,9 +213,19 @@ static void keypad_timer_handler(unsigned long data)
 
 		while (press_mask) {
 			if (press_mask & 1) {
-				input_report_key(dev,pdata->keycodes[i],1);
-				DPRINTK("\nkey Pressed  : key %d map %d\n",i, pdata->keycodes[i]);
+				if(s3ckeypad_evt_enable_status){		//NAGSM_Android_SEL_Kernel_Aakash_20100319
+
+					#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_KEPLER_VER_B4) || defined(CONFIG_T959_VER_B5)
+						if((i != 1) && (i !=2)){
+							input_report_key(dev,pdata->keycodes[i],1);
+							printk("\nkey Pressed  : key %d map %d\n",i, pdata->keycodes[i]);
 						}
+					#else					
+				input_report_key(dev,pdata->keycodes[i],1);
+					DPRINTK("\nkey Pressed  : key %d map %d\n",i, pdata->keycodes[i]);
+					#endif
+				}
+			}
 			press_mask >>= 1;
 			i++;
 		}
@@ -170,10 +234,119 @@ static void keypad_timer_handler(unsigned long data)
 
 		while (release_mask) {
 			if (release_mask & 1) {
+				if(s3ckeypad_evt_enable_status){		//NAGSM_Android_SEL_Kernel_Aakash_20100319
+					#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_KEPLER_VER_B4) || defined(CONFIG_T959_VER_B5)
+						if((i != 1) && (i !=2)){
+							input_report_key(dev,pdata->keycodes[i],0);
+							printk("\nkey Released : %d  map %d\n",i,pdata->keycodes[i]);
+						}
+					#else					
 				input_report_key(dev,pdata->keycodes[i],0);
-				DPRINTK("\nkey Released : %d  map %d\n",i,pdata->keycodes[i]);
+					DPRINTK("\nkey Released : %d  map %d\n",i,pdata->keycodes[i]);
+					#endif
+				}
+				
+#ifdef CONFIG_KERNEL_DEBUG_SEC
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD) || defined(CONFIG_T959_VER_B5)
 
-            }
+	#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_KEPLER_VER_B4) || defined(CONFIG_T959_VER_B5)
+		if((i != 1) && (i !=2)){
+			dump_mode_key_sequence[dump_mode_key_count%DUMP_SEQUENCE_COUNT] = i;
+			dump_mode_key_count++;
+		}
+	#endif
+	#if defined(CONFIG_KEPLER_VER_B0)
+	dump_mode_key_sequence[dump_mode_key_count%DUMP_SEQUENCE_COUNT] = i;
+	dump_mode_key_count++;
+	#endif
+
+       {
+            // check time inverval between force upload key sequence input
+		int this_cpu;
+		this_cpu = smp_processor_id();
+		unsigned long nanosec_rem;
+						
+		dump_mode_key_pressed = cpu_clock(this_cpu);
+		nanosec_rem = do_div(dump_mode_key_pressed, 1000000000);
+
+		if ((dump_mode_key_pressed-dump_mode_key_pressed_prev>=2) && dump_mode_key_pressed_prev!=0)
+                {
+			forced_dump_time_limit=1;
+              printk("force upload long time : %ul\n ",
+			dump_mode_key_pressed-dump_mode_key_pressed_prev);
+                 }
+	
+		dump_mode_key_pressed_prev=dump_mode_key_pressed;
+						
+	}
+
+	if(i == PRESSED_DOWN){	
+		if(is_first_key_down == 1)
+		{	// when down key is pressed twice, will check whether pressed keys are same as dump seqence 
+			is_dump_sequence = 0;
+
+			//for(dump_compare_count=0; dump_compare_count<DUMP_SEQUENCE_COUNT; dump_compare_count++)
+				//printk("dump_mode_key_sequence[%d] : %d\n",(dump_mode_key_count + dump_compare_count)%DUMP_SEQUENCE_COUNT, dump_mode_key_sequence[(dump_mode_key_count + dump_compare_count)%DUMP_SEQUENCE_COUNT]);
+			
+			for(dump_compare_count=0; dump_compare_count<DUMP_SEQUENCE_COUNT; dump_compare_count++)
+			{			
+				//printk("forced_dump_sequence[%d] : %d, dump_mode_key_sequence[%d] : %d\n",dump_compare_count, forced_dump_sequence[dump_compare_count],(dump_mode_key_count + dump_compare_count)%DUMP_SEQUENCE_COUNT, dump_mode_key_sequence[(dump_mode_key_count + dump_compare_count)%DUMP_SEQUENCE_COUNT]);
+				if(forced_dump_sequence[dump_compare_count] == dump_mode_key_sequence[((dump_mode_key_count + dump_compare_count) % DUMP_SEQUENCE_COUNT)]){
+					is_dump_sequence++;
+					continue;
+				}else
+				{	
+					//printk("This is not dump sequence.\n");
+					is_dump_sequence = 0;
+					break;
+				}
+			}
+			
+			if(is_dump_sequence == DUMP_SEQUENCE_COUNT)
+			{		
+                  if (forced_dump_time_limit==1)
+                                {
+                                        // case of long time between force upload key sequence
+                       forced_dump_time_limit=0;
+                       is_dump_sequence=0;
+                       dump_mode_key_pressed_prev=0;
+                       printk("Dump Mode Fail\n");
+                                }
+                  else	
+                                {	
+
+						if( (KERNEL_SEC_DEBUG_LEVEL_MID == kernel_sec_get_debug_level()) || 
+							  (KERNEL_SEC_DEBUG_LEVEL_HIGH == kernel_sec_get_debug_level()) )	
+							{
+								
+					printk("Now going to Dump Mode\n");
+					if (kernel_sec_viraddr_wdt_reset_reg)
+					{
+						kernel_sec_set_cp_upload();
+						kernel_sec_save_final_context(); // Save theh final context.
+						kernel_sec_set_upload_cause(UPLOAD_CAUSE_FORCED_UPLOAD);
+						kernel_sec_hw_reset(FALSE); 	 // Reboot.
+					}
+							}
+					
+                                }
+			}
+		}else{
+			is_first_key_down = 1;
+		}
+	}else{
+		#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_KEPLER_VER_B4) || defined(CONFIG_T959_VER_B5)
+			if((i != 1) && (i !=2)){
+				is_first_key_down = 0;
+			}
+		#endif
+		#if defined(CONFIG_KEPLER_VER_B0)
+		is_first_key_down = 0;
+		#endif			
+	}				
+#endif
+#endif
+			}
 			release_mask >>= 1;
 			i++;
 		}
@@ -223,10 +396,13 @@ static irqreturn_t s3c_keygpio_isr(int irq, void *dev_id)
 	
 	key_status = (readl(S5PC11X_GPH2DAT)) & (1 << 6);
 	
+	if(s3ckeypad_evt_enable_status)		//NAGSM_Android_SEL_Kernel_Aakash_20100319
+	{
 	if(key_status)
 		input_report_key(dev,26,0);
 	else
 		input_report_key(dev,26,1);
+	}									//NAGSM_Android_SEL_Kernel_Aakash_20100319
 
 	printk(KERN_DEBUG "s3c_keygpio_isr key_status =%d,\n", key_status);
 	//printk(KERN_DEBUG "eint 2 irq status s3c_keygpio_isr PEND= %d, MASK = %d\n", readl(S5PC11X_EINTPEND(2)), readl(S5PC11X_EINTMASK(2)));
@@ -243,13 +419,15 @@ static irqreturn_t s3c_keygpio_vol_up_isr(int irq, void *dev_id)
 	//we cannot check HWREV 0xb and 0xc, we check 2 hw key
 	key_status = (readl(S5PC11X_GPH3DAT)) & ((1 << 3));
 	
+	if(s3ckeypad_evt_enable_status)		//NAGSM_Android_SEL_Kernel_Aakash_20100319
+	{
 	if(key_status == ((1 << 3)))
 		input_report_key(dev,42,0);
 	else
 		input_report_key(dev,42,1);
-
+	}									//NAGSM_Android_SEL_Kernel_Aakash_20100319
        printk(KERN_DEBUG "s3c_keygpio_vol_up_isr key_status =%d,\n", key_status);
-       
+
         return IRQ_HANDLED;
 }
 
@@ -280,21 +458,69 @@ static irqreturn_t s3c_keygpio_ok_isr(int irq, void *dev_id)
 
 	//we cannot check HWREV 0xb and 0xc, we check 2 hw key
 	key_status = (readl(S5PC11X_GPH3DAT)) & ((1 << 5));
+	
+	if(s3ckeypad_evt_enable_status)		//NAGSM_Android_SEL_Kernel_Aakash_20100319
+	{	
 	if(key_status == ((1 << 5)))
+#ifdef CONFIG_S5PC110_FLEMING_BOARD
+		input_report_key(dev,28,0);
+#else
 		input_report_key(dev,50,0);
+#endif
 	else
+#ifdef CONFIG_S5PC110_FLEMING_BOARD
+		input_report_key(dev,28,1);
+#else
 		input_report_key(dev,50,1);
-
+#endif 
+	}									//NAGSM_Android_SEL_Kernel_Aakash_20100319
         printk(KERN_DEBUG "s3c_keygpio_ok_isr key_status =%d,\n", key_status);
-        
+
         return IRQ_HANDLED;
 }
-
-extern unsigned int HWREV;
-
 static int s3c_keygpio_isr_setup(void *pdev)
 {
 	int ret;
+
+#if defined(CONFIG_BEHOLD3_VER_B0)
+	//volume up
+	s3c_gpio_setpull(S5PC11X_GPH3(3), S3C_GPIO_PULL_UP);
+	set_irq_type(IRQ_EINT(27), IRQ_TYPE_EDGE_BOTH);
+		ret = request_irq(IRQ_EINT(27), s3c_keygpio_vol_up_isr, IRQF_SAMPLE_RANDOM,
+				"key vol up", (void *) pdev);
+		if (ret) {
+				printk("request_irq failed (IRQ_KEYPAD (key vol up)) !!!\n");
+				ret = -EIO;
+		  return ret;
+		}
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#elif defined(CONFIG_T959_VER_B0) || defined(CONFIG_T959_VER_B5)
+
+		//ok key
+		s3c_gpio_setpull(S5PC11X_GPH3(5), S3C_GPIO_PULL_UP);
+		set_irq_type(IRQ_EINT(29), IRQ_TYPE_EDGE_BOTH);
+	        ret = request_irq(IRQ_EINT(29), s3c_keygpio_ok_isr, IRQF_SAMPLE_RANDOM,
+	                "key ok", (void *) pdev);
+	        if (ret) {
+	                printk("request_irq failed (IRQ_KEYPAD (key ok)) !!!\n");
+	                ret = -EIO;
+			  return ret;
+	  }
+	        
+#elif defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)
+#elif defined(CONFIG_S5PC110_FLEMING_BOARD)
+  //ok key
+  s3c_gpio_setpull(S5PC11X_GPH3(5), S3C_GPIO_PULL_UP);
+  set_irq_type(IRQ_EINT(29), IRQ_TYPE_EDGE_BOTH);
+	  ret = request_irq(IRQ_EINT(29), s3c_keygpio_ok_isr, IRQF_SAMPLE_RANDOM,
+			  "key ok", (void *) pdev);
+	  if (ret) {
+			  printk("request_irq failed (IRQ_KEYPAD (key ok)) !!!\n");
+			  ret = -EIO;
+		return ret;
+}
+
+#else
 
 	if(HWREV >= 0xB)
 	{
@@ -358,7 +584,7 @@ static int s3c_keygpio_isr_setup(void *pdev)
 	        }
 		 #endif
 	}
-
+#endif
 
 	//PWR key
 	s3c_gpio_setpull(S5PC11X_GPH2(6), S3C_GPIO_PULL_UP);
@@ -381,7 +607,13 @@ static ssize_t keyshort_test(struct device *dev, struct device_attribute *attr, 
 {
 	int count;
 	
+#if defined (CONFIG_S5PC110_KEPLER_BOARD) || defined (CONFIG_T959_VER_B5)
+	if(!gpio_get_value(GPIO_KBR0)||!gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER))
+#elif defined CONFIG_S5PC110_T959_BOARD && !defined (CONFIG_T959_VER_B5)
+	if(!gpio_get_value(GPIO_KBR0) || !gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER)  || !gpio_get_value(S5PC11X_GPH3(5)))
+#else
        if(!gpio_get_value(GPIO_KBR0) || !gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER)  || !gpio_get_value(S5PC11X_GPH3(5)))
+#endif
 	{
 		count = sprintf(buf,"PRESS\n");
               printk("keyshort_test: PRESS\n");
@@ -520,7 +752,7 @@ static int __init s3c_keypad_probe(struct platform_device *pdev)
 
 	s3c_keygpio_isr_setup((void *)s3c_keypad);
 	printk( DEVICE_NAME " Initialized\n");
-
+	
 	if (device_create_file(&pdev->dev, &dev_attr_key_pressed) < 0)
 	{
 		printk("%s s3c_keypad_probe\n",__FUNCTION__);
@@ -657,6 +889,19 @@ static struct platform_driver s3c_keypad_driver = {
 static int __init s3c_keypad_init(void)
 {
 	int ret;
+
+//NAGSM_Android_SEL_Kernel_Aakash_20100319
+	s3ckeypad_class= class_create(THIS_MODULE, "s3ckeypadevtcntrl");
+	if (IS_ERR(s3ckeypad_class))
+		pr_err("Failed to create class(s3ckeypadevtcntrl)!\n");
+
+	s3ckeypad_dev= device_create(s3ckeypad_class, NULL, 0, NULL, "s3ckeypad_control");
+	if (IS_ERR(s3ckeypad_dev))
+		pr_err("Failed to create device(s3ckeypad_control)!\n");
+	if (device_create_file(s3ckeypad_dev, &dev_attr_s3ckeypadevtcntrl) < 0)
+		pr_err("Failed to create device file(%s)!\n", dev_attr_s3ckeypadevtcntrl.attr.name);
+//NAGSM_Android_SEL_Kernel_Aakash_20100319
+
 
 	ret = platform_driver_register(&s3c_keypad_driver);
 	

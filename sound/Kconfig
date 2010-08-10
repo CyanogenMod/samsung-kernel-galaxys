@@ -32,6 +32,14 @@ config SOUND_OSS_CORE
 	bool
 	default n
 
+config KEPLER_AUDIO_A1026
+	bool "A1026"
+	default n
+	
+config AUDIO_HW_Rev02
+	bool "A1026_HW_Rev02"
+	default n	
+	
 source "sound/oss/dmasound/Kconfig"
 
 if !M68K

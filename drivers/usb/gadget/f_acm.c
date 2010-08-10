@@ -488,9 +488,12 @@ static int acm_cdc_notify(struct f_acm *acm, u8 type, u16 value,
 	spin_lock(&acm->lock);
 
 	if (status < 0) {
-		ERROR(acm->port.func.config->cdev,
-				"acm ttyGS%d can't notify serial state, %d\n",
-				acm->port_num, status);
+
+//hdlnc_ysyim_2010-4-26: remove log for popupnois when usb unmout		
+//		ERROR(acm->port.func.config->cdev,
+//				"acm ttyGS%d can't notify serial state, %d\n",
+//				acm->port_num, status);
+//		printk("acm_cdc_notify:ttyGS%d ,%d\n",acm->port_num, status);
 		acm->notify_req = req;
 	}
 

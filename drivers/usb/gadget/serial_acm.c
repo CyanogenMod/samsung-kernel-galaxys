@@ -89,7 +89,8 @@ EXPORT_SYMBOL(notify_control_line_state);
 static int 
 modem_ioctl (struct inode *inode, struct file *file, unsigned int  cmd,unsigned long arg)
 {
-	printk("modem_ioctl: cmd=0x%x, arg=%lu\n", cmd, arg);
+	//hdlnc_ysyim_2010-4-26: remove log for popupnois when usb unmout	
+	//printk("modem_ioctl: cmd=0x%x, arg=%lu\n", cmd, arg);
 
 	/* handle ioctls */
 	switch (cmd) 

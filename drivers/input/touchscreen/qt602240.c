@@ -5362,6 +5362,7 @@ typedef struct
 #define MAX_USING_FINGER_NUM	5
 
 static report_finger_info_t fingerInfo[MAX_USING_FINGER_NUM]={0};
+static int qt_initial_ok=0;
 #endif
 
 #ifdef QT_STYLUS_ENABLE
@@ -5534,11 +5535,13 @@ spt_comcconfig_t18_config_t   comc_config = {0};            //Communication conf
 int check_realboard(void)
 {
 	extern unsigned int HWREV;
-
+#if defined(CONFIG_S5PC110_T959_BOARD) || defined(CONFIG_S5PC110_KEPLER_BOARD)
+	return 1; 
+#endif 
 	if (HWREV >8)
 		return 1;
 	else
-		return HWREV%2;
+	return HWREV%2;
 }
 
 
@@ -5650,9 +5653,18 @@ void qt_Multitouchscreen_Init(void)
 #endif
     touchscreen_config.xorigin = 0;
     touchscreen_config.yorigin = 0;
-#if defined CONFIG_ARIES_VER_B0  || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2) || (defined CONFIG_ARIES_VER_B3)	
+#if defined CONFIG_ARIES_VER_B0  || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2) || (defined CONFIG_ARIES_VER_B3)		
+#if defined CONFIG_KEPLER_TSP_VER3_5
+    touchscreen_config.xsize = 17;
+    touchscreen_config.ysize = 10;
+#elif defined CONFIG_FLEMING_VER_B0
+    touchscreen_config.xsize = 16;
+    touchscreen_config.ysize = 10;
+#else
     touchscreen_config.xsize = 19;
     touchscreen_config.ysize = 11;
+
+#endif
 #else
 	touchscreen_config.xsize = 16;
 	touchscreen_config.ysize = 10;
@@ -5672,8 +5684,14 @@ else
 	touchscreen_config.tchthr = 50;
 
     touchscreen_config.tchdi = 2;
-#if defined CONFIG_ARIES_VER_B0 || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2) || (defined CONFIG_ARIES_VER_B3)	
+#if defined CONFIG_ARIES_VER_B0 || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2) || (defined CONFIG_ARIES_VER_B3)		
+#if defined CONFIG_KEPLER_TSP_VER3_5
+    touchscreen_config.orient = 5;
+#elif defined CONFIG_FLEMING_VER_B0
+	touchscreen_config.orient = 7;
+#else
     touchscreen_config.orient = 1;
+#endif 
 #elif defined CONFIG_JUPITER_VER_B5
 	touchscreen_config.orient = 7;
 #else
@@ -6243,7 +6261,7 @@ uint8_t calibrate_chip(void)
 		/* resume calibration must be performed with zero settings */
 		acquisition_config.atchcalst = 0;
 		acquisition_config.atchcalsthr = 0; 
-
+		  
 		  dprintk("\n[TSP][%s] \n", __func__);
 		dprintk("[TSP] reset acq atchcalst=%d, atchcalsthr=%d\n", acquisition_config.atchcalst, acquisition_config.atchcalsthr );
 
@@ -7954,107 +7972,107 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 
 	if(tsp_version >=0x16)
 	{
-		/* we have had the first touchscreen or face suppression message 
-		 * after a calibration - check the sensor state and try to confirm if
-		 * cal was good or bad */
+	/* we have had the first touchscreen or face suppression message 
+	 * after a calibration - check the sensor state and try to confirm if
+	 * cal was good or bad */
 
-		/* get touch flags from the chip using the diagnostic object */
-		/* write command to command processor to get touch flags - 0xF3 Command required to do this */
-		write_mem(command_processor_address + DIAGNOSTIC_OFFSET, 1, &data_byte);
-		/* get the address of the diagnostic object so we can get the data we need */
-		diag_address = get_object_address(DEBUG_DIAGNOSTIC_T37,0);
+	/* get touch flags from the chip using the diagnostic object */
+	/* write command to command processor to get touch flags - 0xF3 Command required to do this */
+	write_mem(command_processor_address + DIAGNOSTIC_OFFSET, 1, &data_byte);
+	/* get the address of the diagnostic object so we can get the data we need */
+	diag_address = get_object_address(DEBUG_DIAGNOSTIC_T37,0);
 
-		msleep(10); 
+	msleep(10); 
 
-		/* read touch flags from the diagnostic object - clear buffer so the while loop can run first time */
-		memset( data_buffer , 0xFF, sizeof( data_buffer ) );
+	/* read touch flags from the diagnostic object - clear buffer so the while loop can run first time */
+	memset( data_buffer , 0xFF, sizeof( data_buffer ) );
 
-		/* wait for diagnostic object to update */
-		while(!((data_buffer[0] == 0xF3) && (data_buffer[1] == 0x00)))
-		{
-			/* wait for data to be valid  */
+	/* wait for diagnostic object to update */
+	while(!((data_buffer[0] == 0xF3) && (data_buffer[1] == 0x00)))
+	{
+		/* wait for data to be valid  */
 			if(try_ctr > 10) //0318 hugh 100-> 10
-			{
-				/* Failed! */
+		{
+			/* Failed! */
 				dprintk("[TSP] Diagnostic Data did not update!!\n");
 				qt_timer_state = 0;//0430 hugh
-				break;
-			}
+			break;
+		}
 			msleep(2); //0318 hugh  3-> 2
-			try_ctr++; /* timeout counter */
-			read_mem(diag_address, 2,data_buffer);
+		try_ctr++; /* timeout counter */
+		read_mem(diag_address, 2,data_buffer);
 			dprintk("[TSP] Waiting for diagnostic data to update, try %d\n", try_ctr);
+	}
+
+
+	/* data is ready - read the detection flags */
+	read_mem(diag_address, 82,data_buffer);
+
+	/* data array is 20 x 16 bits for each set of flags, 2 byte header, 40 bytes for touch flags 40 bytes for antitouch flags*/
+
+	/* count up the channels/bits if we recived the data properly */
+	if((data_buffer[0] == 0xF3) && (data_buffer[1] == 0x00))
+	{
+
+		/* mode 0 : 16 x line, mode 1 : 17 etc etc upto mode 4.*/
+		x_line_limit = 16 + cte_config.mode;
+		if(x_line_limit > 20)
+		{
+			/* hard limit at 20 so we don't over-index the array */
+			x_line_limit = 20;
+		}
+
+		/* double the limit as the array is in bytes not words */
+		x_line_limit = x_line_limit << 1;
+
+		/* count the channels and print the flags to the log */
+		for(i = 0; i < x_line_limit; i+=2) /* check X lines - data is in words so increment 2 at a time */
+		{
+			/* print the flags to the log - only really needed for debugging */
+			//printk("[TSP] Detect Flags X%d, %x%x, %x%x \n", i>>1,data_buffer[3+i],data_buffer[2+i],data_buffer[43+i],data_buffer[42+i]);
+
+			/* count how many bits set for this row */
+			for(j = 0; j < 8; j++)
+			{
+				/* create a bit mask to check against */
+				check_mask = 1 << j;
+
+				/* check detect flags */
+				if(data_buffer[2+i] & check_mask)
+				{
+					tch_ch++;
+				}
+				if(data_buffer[3+i] & check_mask)
+				{
+					tch_ch++;
+				}
+
+				/* check anti-detect flags */
+				if(data_buffer[42+i] & check_mask)
+				{
+					atch_ch++;
+				}
+				if(data_buffer[43+i] & check_mask)
+				{
+					atch_ch++;
+				}
+			}
 		}
 
 
-		/* data is ready - read the detection flags */
-		read_mem(diag_address, 82,data_buffer);
-
-		/* data array is 20 x 16 bits for each set of flags, 2 byte header, 40 bytes for touch flags 40 bytes for antitouch flags*/
-
-		/* count up the channels/bits if we recived the data properly */
-		if((data_buffer[0] == 0xF3) && (data_buffer[1] == 0x00))
-		{
-
-			/* mode 0 : 16 x line, mode 1 : 17 etc etc upto mode 4.*/
-			x_line_limit = 16 + cte_config.mode;
-			if(x_line_limit > 20)
-			{
-				/* hard limit at 20 so we don't over-index the array */
-				x_line_limit = 20;
-			}
-
-			/* double the limit as the array is in bytes not words */
-			x_line_limit = x_line_limit << 1;
-
-			/* count the channels and print the flags to the log */
-			for(i = 0; i < x_line_limit; i+=2) /* check X lines - data is in words so increment 2 at a time */
-			{
-				/* print the flags to the log - only really needed for debugging */
-				//printk("[TSP] Detect Flags X%d, %x%x, %x%x \n", i>>1,data_buffer[3+i],data_buffer[2+i],data_buffer[43+i],data_buffer[42+i]);
-
-				/* count how many bits set for this row */
-				for(j = 0; j < 8; j++)
-				{
-					/* create a bit mask to check against */
-					check_mask = 1 << j;
-
-					/* check detect flags */
-					if(data_buffer[2+i] & check_mask)
-					{
-						tch_ch++;
-					}
-					if(data_buffer[3+i] & check_mask)
-					{
-						tch_ch++;
-					}
-
-					/* check anti-detect flags */
-					if(data_buffer[42+i] & check_mask)
-					{
-						atch_ch++;
-					}
-					if(data_buffer[43+i] & check_mask)
-					{
-						atch_ch++;
-					}
-				}
-			}
-
-
-			/* print how many channels we counted */
+		/* print how many channels we counted */
 			dprintk("[TSP] Flags Counted channels: t:%d a:%d \n", tch_ch, atch_ch);
 
-			/* send page up command so we can detect when data updates next time,
-			 * page byte will sit at 1 until we next send F3 command */
-			data_byte = 0x01;
-			write_mem(command_processor_address + DIAGNOSTIC_OFFSET, 1, &data_byte);
+		/* send page up command so we can detect when data updates next time,
+		 * page byte will sit at 1 until we next send F3 command */
+		data_byte = 0x01;
+		write_mem(command_processor_address + DIAGNOSTIC_OFFSET, 1, &data_byte);
 
-			/* process counters and decide if we must re-calibrate or if cal was good */      
+		/* process counters and decide if we must re-calibrate or if cal was good */      
 //0413			if((tch_ch>=0) && (atch_ch <= 1))  //jwlee change.
 			if((tch_ch>0) && (atch_ch == 0))  //jwlee change.
-			{
-				/* cal was good - don't need to check any more */
+		{
+			/* cal was good - don't need to check any more */
 				//hugh 0312
 #if 1
 				if(!check_abs_time())
@@ -8069,22 +8087,22 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 				if(good_check_flag >=2)
 #endif
 				{
-					dprintk("[TSP] calibration was good\n");
-					cal_check_flag = 0;
+				dprintk("[TSP] calibration was good\n");
+			cal_check_flag = 0;
 					good_check_flag = 0;
 					qt_timer_state =0;
 					qt_time_point = jiffies_to_msecs(jiffies);
 
 					dprintk("[TSP] reset acq atchcalst=%d, atchcalsthr=%d\n", acquisition_config.atchcalst, acquisition_config.atchcalsthr );
-					/* Write normal acquisition config back to the chip. */
-					if (write_acquisition_config(acquisition_config) != CFG_WRITE_OK)
-					{
-						/* "Acquisition config write failed!\n" */
+			/* Write normal acquisition config back to the chip. */
+			if (write_acquisition_config(acquisition_config) != CFG_WRITE_OK)
+			{
+				/* "Acquisition config write failed!\n" */
 						printk(KERN_DEBUG "\n[TSP][ERROR] line : %d\n", __LINE__);
-						// MUST be fixed
-					}
+				// MUST be fixed
+			}
 
-				}
+		}
 					else 
 					{
 						cal_check_flag = 1;
@@ -8110,10 +8128,10 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 				        
 				}       
 #endif
-			}
+					}
 //Org of Dan			else if((tch_ch + CAL_THR /*10*/ ) <= atch_ch)
 			else if(atch_ch >= 8)		//jwlee add 0325
-			{
+		{
 #if 1
 				printk(KERN_DEBUG "[TSP] calibration was bad\n");
 				/* cal was bad - must recalibrate and check afterwards */
@@ -8123,10 +8141,10 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 #else
                             good_check_flag = 0; //hugh 0312
 				printk(KERN_DEBUG "[TSP] calibration was bad\n");
-				/* cal was bad - must recalibrate and check afterwards */
-				calibrate_chip();
+			/* cal was bad - must recalibrate and check afterwards */
+			calibrate_chip();
 #endif
-			}
+		}
 #if 1
 			else {
 				dprintk("[TSP] calibration was not decided yet\n");
@@ -8138,7 +8156,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 				}
 #endif
 
-		}
+	}
 	}
 }
 
@@ -8244,12 +8262,16 @@ EXPORT_SYMBOL(set_tsp_for_ta_detect);
 void TSP_forced_release(void)
 {
 	int i=1;
+	int temp_value=0;
+
+	if (qt_initial_ok == 0)
+		return;
 
 	for ( i= 1; i<MAX_USING_FINGER_NUM; ++i )
 	{
 		if ( fingerInfo[i].pressure == -1 ) continue;
 
-		fingerInfo[i].pressure == 0;
+		fingerInfo[i].pressure = 0;
 
 		input_report_abs(qt602240->input_dev, ABS_MT_POSITION_X, fingerInfo[i].x);
 		input_report_abs(qt602240->input_dev, ABS_MT_POSITION_Y, fingerInfo[i].y);
@@ -8258,7 +8280,9 @@ void TSP_forced_release(void)
 		input_mt_sync(qt602240->input_dev);
 
 		if ( fingerInfo[i].pressure == 0 ) fingerInfo[i].pressure= -1;
+		temp_value++;
 	}
+	if(temp_value>0)
 	input_sync(qt602240->input_dev);
 }
 EXPORT_SYMBOL(TSP_forced_release);
@@ -8282,7 +8306,7 @@ void  get_message(struct work_struct * p)
 
 	static long cnt=0;
 	int amplitude=0;	
-	cnt++;	
+	cnt++;
 
 	if (driver_setup == DRIVER_SETUP_OK)
 	{
@@ -8341,7 +8365,7 @@ void  get_message(struct work_struct * p)
 				if((quantum_msg[0] == 1)&&((quantum_msg[1]&0x10) == 0x10)){
 					dprintk(" [TSP] quantum_msg[0] = 1 and quantum_msg[1] = 0x10  cal_check_flag=1\n");
 //					cal_check_flag = 1u;
-				}
+					}
 				else if((quantum_msg[0] == 1) && ((quantum_msg[1]&0x10)==0)/* && (cal_check_flag==1)*/){
 					dprintk(" [TSP] quantum_msg[0] = 1 and quantum_msg[1] = 0x00  cal_check_flag=2\n");
 //					cal_check_flag = 2u;
@@ -8349,14 +8373,14 @@ void  get_message(struct work_struct * p)
 					{
 						check_chip_calibration(1);
 					}
-				}
+					}
 
 				if ((quantum_msg[0] ==  14) ||(quantum_msg[0] == 0) ||(quantum_msg[0] == 0xFF)) {
 					if(touch_message_flag && (cal_check_flag/*==2*/))
 					{
 						check_chip_calibration(one_touch_input_flag);
 					}
-				}
+					}
 				if(readl(gpio_pend_mask_mem)&(0x1<<5))
 					writel(readl(gpio_pend_mask_mem)|(0x1<<5), gpio_pend_mask_mem); 
 				enable_irq(qt602240->client->irq);
@@ -8400,8 +8424,8 @@ void  get_message(struct work_struct * p)
 			#ifdef CONFIG_CPU_FREQ
 			#if USE_PERF_LEVEL_TS
 				if(id == 0){
-					s5pc110_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_4);
-					set_dvfs_perf_level();
+				s5pc110_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_4);
+				set_dvfs_perf_level();
 					touch_state_val=0;
 					}
 			#endif
@@ -8413,13 +8437,13 @@ void  get_message(struct work_struct * p)
 				printk(KERN_DEBUG "[TSP]### Finger[%d] Up (%d,%d) - touch num is (%d)  status=0x%02x\n", id, fingerInfo[id].x, fingerInfo[id].y , --qt_touch_num_state[id], quantum_msg[1]);
 			}
 			else if ( (quantum_msg[1] & 0x80) && (quantum_msg[1] & 0x40) )	// Detect & Press
-			{
+			{		
 			touch_message_flag = 1; //20100217 julia
 			#ifdef CONFIG_CPU_FREQ
 			#if USE_PERF_LEVEL_TS
 				if(id == 0){
-					set_dvfs_perf_level();
-					s5pc110_lock_dvfs_high_level(DVFS_LOCK_TOKEN_4,0);
+				set_dvfs_perf_level();
+				s5pc110_lock_dvfs_high_level(DVFS_LOCK_TOKEN_4,0);
 					touch_state_val=1;
 					}
 			#endif
@@ -8446,7 +8470,7 @@ void  get_message(struct work_struct * p)
 				fingerInfo[id].y= (int16_t)y;
 				//printk("##### Finger[%d] Move (%d,%d)!\n", id, fingerInfo[id].x, fingerInfo[id].y );
 			}
-					
+			
 #else			 
 			if( ((quantum_msg[1] & 0x80) == 0x80 ) && ((quantum_msg[1] & 0x40) == 0x40) )    // case 11000000 -> DETECT & PRESS
 			{
@@ -8914,6 +8938,8 @@ int qt602240_probe(struct platform_device *dev)
 	register_early_suspend(&qt602240->early_suspend);
 #endif	/* CONFIG_HAS_EARLYSUSPEND */
 #endif //USE_TS_EARLY_SUSPEND
+
+	qt_initial_ok = 1;
 	return 0;
 
 err_input_register_device_failed:
@@ -8945,7 +8971,7 @@ static int qt602240_suspend(struct platform_device * dev,pm_message_t mesg)
 	gen_powerconfig_t7_config_t power_config_sleep = {0};
 	int i=0;
 
-	ENTER_FUNC;
+	//ENTER_FUNC;
 
 	disable_irq(qt602240->client->irq);
 
@@ -8966,7 +8992,7 @@ static int qt602240_suspend(struct platform_device * dev,pm_message_t mesg)
 	for (i=0; i<MAX_USING_FINGER_NUM ; i++)
 		fingerInfo[i].pressure = -1;
 #endif
-	LEAVE_FUNC;
+	//LEAVE_FUNC;
 	return 0;
 }
 
@@ -8975,7 +9001,7 @@ static int qt602240_resume(struct platform_device *dev)
 {
 	int ret,i;
 
-	ENTER_FUNC;
+	//ENTER_FUNC;
 
 	//init_hw_setting();
 	printk("\n[TSP][%s] \n",__func__);
@@ -8997,7 +9023,7 @@ static int qt602240_resume(struct platform_device *dev)
 
 	calibrate_chip();
 	enable_irq(qt602240->client->irq);
-	LEAVE_FUNC;
+	//LEAVE_FUNC;
 	return 0;
 
 }
@@ -9010,9 +9036,11 @@ static void qt602240_early_suspend(struct early_suspend *h)
 	gen_powerconfig_t7_config_t power_config_sleep = {0};
 	int i=0;
 
-	ENTER_FUNC;
-	printk(KERN_DEBUG "\n[TSP][%s] \n",__func__);
+	//ENTER_FUNC;
+	//printk("\n[TSP][%s] \n",__func__);
 	disable_irq(qt602240->client->irq);
+
+	
 
 	/* Set power config. */
 	/* Set Idle Acquisition Interval to 32 ms. */
@@ -9043,9 +9071,10 @@ static void qt602240_late_resume(struct early_suspend *h)
 {
 	int ret,i;
 
-	ENTER_FUNC;
+	//ENTER_FUNC;
 
 	//init_hw_setting();
+
 	printk(KERN_DEBUG "\n[TSP][%s] \n",__func__);
 	if ( (ret = write_power_config(power_config)) != CFG_WRITE_OK)
 	{
@@ -9059,6 +9088,7 @@ static void qt602240_late_resume(struct early_suspend *h)
 		if( i == 10)
 			return -1;
 	}
+
 	//hugh 0312
 	good_check_flag=0;
 
@@ -9066,8 +9096,8 @@ static void qt602240_late_resume(struct early_suspend *h)
 	calibrate_chip();
 	msleep(20);
 	enable_irq(qt602240->client->irq);
-	
-	LEAVE_FUNC;
+
+	//LEAVE_FUNC;
 	return 0;
 }
 #endif	// End of CONFIG_HAS_EARLYSUSPEND
@@ -9220,23 +9250,23 @@ static ssize_t gpio_store(
 	if(strncmp(buf, "ENHIGH", 6) == 0 || strncmp(buf, "enhigh", 6) == 0) {
 		gpio_set_value(GPIO_TOUCH_EN, 1);
 		printk("set TOUCH_EN High.\n");
-		mdelay(100);
+		msleep(100);
 	}
 	if(strncmp(buf, "ENLOW", 5) == 0 || strncmp(buf, "enlow", 5) == 0) {
 		gpio_set_value(GPIO_TOUCH_EN, 0);
 		printk("set TOUCH_EN Low.\n");
-		mdelay(100);
+		msleep(100);
 	}
 
 	if(strncmp(buf, "RSTHIGH", 7) == 0 || strncmp(buf, "rsthigh", 7) == 0) {
 		gpio_set_value(GPIO_TOUCH_RST, 1);
 		printk("set TOUCH_RST High.\n");
-		mdelay(100);
+		msleep(100);
 	}
 	if(strncmp(buf, "RSTLOW", 6) == 0 || strncmp(buf, "rstlow", 6) == 0) {
 		gpio_set_value(GPIO_TOUCH_RST, 0);
 		printk("set TOUCH_RST Low.\n");
-		mdelay(100);
+		msleep(100);
 	}
 
 	return size;
@@ -9310,7 +9340,7 @@ void TSP_Restart(void)
 	}
 	gpio_free(GPIO_TOUCH_EN);
 
-	mdelay(300);
+	msleep(300);
 
 	if (gpio_is_valid(GPIO_TOUCH_EN)) {
 		if (gpio_request(GPIO_TOUCH_EN, "GPG3"))
@@ -9355,7 +9385,7 @@ uint8_t QT_Boot(void)
 		{
 			for(retry_cnt =0; retry_cnt < 3; retry_cnt++)
 			{
-				mdelay(100);
+				msleep(100);
 				reset_result = write_mem(command_processor_address + RESET_OFFSET, 1, &data);
 				if(reset_result == WRITE_MEM_OK)
 				{
@@ -9367,7 +9397,7 @@ uint8_t QT_Boot(void)
 		if (reset_result == WRITE_MEM_OK)
 			printk("Boot reset OK\r\n");
 
-		mdelay(100);
+		msleep(100);
 	
 		for(retry_cnt = 0; retry_cnt < 30; retry_cnt++)
 		{
@@ -9383,9 +9413,9 @@ uint8_t QT_Boot(void)
 				{ 
 					for(j = 0; j<5; j++)
 					{
-						mdelay(60);
-						if(boot_read_mem(0,1,&boot_status) == READ_MEM_OK)
-						{
+						msleep(60);
+			if(boot_read_mem(0,1,&boot_status) == READ_MEM_OK)
+			{
 							read_status_flag = 1;
 							break;
 						}
@@ -9396,79 +9426,79 @@ uint8_t QT_Boot(void)
 					if(read_status_flag==1)	
 		//			if(boot_read_mem(0,1,&boot_status) == READ_MEM_OK)
 					{
-						retry_cnt  = 0;
-						printk("TSP boot status is %x		stage 2 \n", boot_status);
-						if((boot_status & QT_WAITING_BOOTLOAD_COMMAND) == QT_WAITING_BOOTLOAD_COMMAND)
-						{
-							if(boot_unlock() == WRITE_MEM_OK)
-							{
-								mdelay(10);
-			
-								printk("Unlock OK\n");
-			
-							}
-							else
-							{
-								printk("Unlock fail\n");
-							}
-						}
-						else if((boot_status & 0xC0) == QT_WAITING_FRAME_DATA)
-						{
-							 /* Add 2 to frame size, as the CRC bytes are not included */
-							size1 =  *(firmware_data+character_position);
-							size2 =  *(firmware_data+character_position+1)+2;
-							frame_size = (size1<<8) + size2;
-			
-							printk("Frame size:%d\n", frame_size);
-							printk("Firmware pos:%d\n", character_position);
-							/* Exit if frame data size is zero */
-							if( 0 == frame_size )
-							{
-								if(QT_i2c_address == I2C_BOOT_ADDR_0)
-								{
-									QT_i2c_address = I2C_APPL_ADDR_0;
-								}
-								printk("0 == frame_size\n");
-								return 1;
-							}
-							next_frame = 1;
-							boot_write_mem(0,frame_size, (firmware_data +character_position));
-							mdelay(10);
-							printk(".");
-			
-						}
-						else if(boot_status == QT_FRAME_CRC_CHECK)
-						{
-							printk("CRC Check\n");
-						}
-						else if(boot_status == QT_FRAME_CRC_PASS)
-						{
-							if( next_frame == 1)
-							{
-								printk("CRC Ok\n");
-								character_position += frame_size;
-								next_frame = 0;
-							}
-							else {
-								printk("next_frame != 1\n");
-							}
-						}
-						else if(boot_status  == QT_FRAME_CRC_FAIL)
-						{
-							printk("CRC Fail\n");
-							crc_error_count++;
-						}
-						if(crc_error_count > 10)
-						{
-							return QT_FRAME_CRC_FAIL;
-						}
-			
+				retry_cnt  = 0;
+				printk("TSP boot status is %x		stage 2 \n", boot_status);
+				if((boot_status & QT_WAITING_BOOTLOAD_COMMAND) == QT_WAITING_BOOTLOAD_COMMAND)
+				{
+					if(boot_unlock() == WRITE_MEM_OK)
+					{
+						msleep(10);
+	
+						printk("Unlock OK\n");
+	
 					}
+					else
+					{
+						printk("Unlock fail\n");
+					}
+				}
+				else if((boot_status & 0xC0) == QT_WAITING_FRAME_DATA)
+				{
+					 /* Add 2 to frame size, as the CRC bytes are not included */
+					size1 =  *(firmware_data+character_position);
+					size2 =  *(firmware_data+character_position+1)+2;
+					frame_size = (size1<<8) + size2;
+	
+					printk("Frame size:%d\n", frame_size);
+					printk("Firmware pos:%d\n", character_position);
+					/* Exit if frame data size is zero */
+					if( 0 == frame_size )
+					{
+						if(QT_i2c_address == I2C_BOOT_ADDR_0)
+						{
+							QT_i2c_address = I2C_APPL_ADDR_0;
+						}
+						printk("0 == frame_size\n");
+						return 1;
+					}
+					next_frame = 1;
+					boot_write_mem(0,frame_size, (firmware_data +character_position));
+					msleep(10);
+					printk(".");
+	
+				}
+				else if(boot_status == QT_FRAME_CRC_CHECK)
+				{
+					printk("CRC Check\n");
+				}
+				else if(boot_status == QT_FRAME_CRC_PASS)
+				{
+					if( next_frame == 1)
+					{
+						printk("CRC Ok\n");
+						character_position += frame_size;
+						next_frame = 0;
+					}
+					else {
+						printk("next_frame != 1\n");
+					}
+				}
+				else if(boot_status  == QT_FRAME_CRC_FAIL)
+				{
+					printk("CRC Fail\n");
+					crc_error_count++;
+				}
+				if(crc_error_count > 10)
+				{
+					return QT_FRAME_CRC_FAIL;
+				}
+	
+			}
 					else
 					{
 						return (0);
 					}
-				}
+		}
 			}
 			else
 			{
@@ -9519,7 +9549,7 @@ uint8_t QT_Boot_no_reset(void)
 				{ 
 					for(j = 0; j<5; j++)
 					{
-						mdelay(60);
+						msleep(60);
 						if(boot_read_mem(0,1,&boot_status) == READ_MEM_OK)
 						{
 							read_status_flag = 1;
@@ -9537,10 +9567,10 @@ uint8_t QT_Boot_no_reset(void)
 						{
 							if(boot_unlock() == WRITE_MEM_OK)
 							{
-								mdelay(10);
+								msleep(10);
 			
 								printk("Unlock OK\n");
-			
+
 							}
 							else
 							{
@@ -9568,7 +9598,7 @@ uint8_t QT_Boot_no_reset(void)
 							}
 							next_frame = 1;
 							boot_write_mem(0,frame_size, (firmware_data +character_position));
-							mdelay(10);
+							msleep(10);
 							printk(".");
 			
 						}
@@ -9625,7 +9655,7 @@ uint8_t QT_Boot_no_reset(void)
 			{
 				if(boot_unlock() == WRITE_MEM_OK)
 				{
-					mdelay(10);
+					msleep(10);
 
 					printk("Unlock OK\n");
 
@@ -9656,7 +9686,7 @@ uint8_t QT_Boot_no_reset(void)
 				}
 				next_frame = 1;
 				boot_write_mem(0,frame_size, (firmware_data +character_position));
-				mdelay(10);
+				msleep(10);
 				printk(".");
 
 			}
@@ -10948,7 +10978,7 @@ static ssize_t set_qt_update_exe(struct device *dev, struct device_attribute *at
 
         printk("Enter to Firmware download by AT command \n");
         if(!QT_Boot())
-        {            	
+        {
 		qt_firm_status_data=2;		// firmware update success
         	printk("Reprogram done : Firmware update Success~~~~~~~~~~\n");
         }
@@ -10967,11 +10997,11 @@ static ssize_t set_qt_update_exe(struct device *dev, struct device_attribute *at
 static ssize_t set_qt_update_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int count;
-		
+
 	printk("touch firmware update \n");
-	qt_firm_status_data=1;	//start firmware updating
-	INIT_WORK(&qt_touch_update_work, set_qt_update_exe);
-	queue_work(qt602240_wq, &qt_touch_update_work);
+		qt_firm_status_data=1;	//start firmware updating
+		INIT_WORK(&qt_touch_update_work, set_qt_update_exe);
+		queue_work(qt602240_wq, &qt_touch_update_work);
 	
 	if(qt_firm_status_data == 3)
 	{
@@ -11000,7 +11030,7 @@ static ssize_t set_qt_firm_status_show(struct device *dev, struct device_attribu
 {
 
 	int count;
-
+	
 	printk("Enter set_qt_firm_status_show by AT command \n");
 	
 	if(qt_firm_status_data == 1)

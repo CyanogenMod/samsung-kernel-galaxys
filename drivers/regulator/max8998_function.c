@@ -54,6 +54,15 @@ static int low_bat1_int_status=0;
 
 extern spinlock_t pmic_access_lock;
 
+
+// [[ junghyunseok edit for stepcharging workqueue function 20100517
+static struct work_struct stepcharging_work;
+int stepchargingCount;
+byte stepchargingreg_buff[2];
+#define CHARGINGSTEP_INTERVAL	50
+static struct timer_list chargingstep_timer;
+// ]] junghyunseok edit for stepcharging 20100506
+
 max8998_reg_type  max8998pm[ENDOFPM+1] =
 {
     /* addr       mask        clear       shift   */
@@ -375,10 +384,19 @@ max8998_irq_table_type max8998_irq_table[ENDOFIRQ+1] = {
     NULL, // DONER
     NULL, // CHGRSTF
     NULL, // DCINOVPR
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+    NULL, // TOPOFFR
+    NULL, // ONKEY1S
+    NULL, // LOBAT2
+    NULL// LOBAT1   
+#else
     maxim_charging_topoff, // TOPOFFR
     NULL, // ONKEY1S
     maxim_low_battery_2nd, // LOBAT2
     maxim_low_battery_1st  // LOBAT1
+#endif
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 };
 #endif
 
@@ -1037,7 +1055,7 @@ boolean Set_MAX8998_PM_REG(max8998_pm_section_type reg_num, byte value)
     {
         // Error - Invalid register
         printk("Set_MAX8998_PM_REG Invalid register\n");
-	    return FALSE;
+	 return FALSE;
     }
 
     spin_lock(&pmic_access_lock);
@@ -1047,7 +1065,7 @@ boolean Set_MAX8998_PM_REG(max8998_pm_section_type reg_num, byte value)
         // Error - I2C read error
         spin_unlock(&pmic_access_lock);
         printk("Set_MAX8998_PM_REG Read failed\n");
-	    return FALSE; // return error
+	return FALSE; // return error
     }
 
     reg_buff = (reg_buff & max8998pm[reg_num].clear) | (value << max8998pm[reg_num].shift);
@@ -1123,13 +1141,18 @@ boolean Set_MAX8998_PM_ADDR(byte reg_addr, byte *reg_buff, byte length)
 		// Error - Invalid Write Register
 		return FALSE;
     }
+
+    spin_lock(&pmic_access_lock);
+	
     if(pmic_write(SLAVE_ADDR_PM, (byte)reg_addr, reg_buff, length) != PMIC_PASS)
     {
         // Error - I2C write error
+	       spin_unlock(&pmic_access_lock);        
 		return FALSE;
     }
 
-	return TRUE;
+    spin_unlock(&pmic_access_lock);
+    return TRUE;
 }
 
 /*===========================================================================
@@ -1217,8 +1240,8 @@ void Set_MAX8998_PM_ONOFF_CNTL(byte onoff_reg, byte cntl_item, byte status)
     }
     else
     {
-        // Error - this condition is not defined
-        return;
+      // Error - this condition is not defined
+      return;
     }
 
     spin_lock(&pmic_access_lock);
@@ -2151,7 +2174,7 @@ irqreturn_t pmic_irq(int irq, void *dev_id)
 
 irqreturn_t pmic_isr(void)
 {	
-	maxim_batt_check();
+//	maxim_batt_check();
 	MAX8998_PM_IRQ_isr();
 	if(readl(pmic_pend_mask_mem)&(0x1<<7))
 		writel(readl(pmic_pend_mask_mem)|(0x1<<7), pmic_pend_mask_mem); 
@@ -2175,7 +2198,9 @@ void lpm_mode_check(void)
 	if(get_boot_charger_info())
 	{
 		if(maxim_lpm_chg_status())
+			{
 			charging_mode_set(1);
+			}
 		else{
 			if (pm_power_off)
 				pm_power_off();
@@ -2204,6 +2229,10 @@ void set_low_bat_interrupt(int on)
 	}
 }
 
+
+
+
+
 /*===========================================================================
 
 FUNCTION MAX8998_IRQ_init                                
@@ -2226,6 +2255,9 @@ void MAX8998_IRQ_init(void)
 	int ret;
 
 	pmic_pend_mask_mem = ioremap(PMIC_INT_PEND, 0x1);
+
+// [[ junghyunseok edit for stepcharging 20100506
+	stepchargingCount = 0;
 
 	irq_mask[0] = (byte)IRQ1_M;
 	irq_mask[1] = (byte)IRQ2_M;
@@ -2864,6 +2896,10 @@ void maxim_vac_disconnect(void)
 	//printk("maxim_vac_disconnect \n");
 	if(!Get_MAX8998_PM_REG(VDCINOK_status))
 	{
+
+// [[ junghyunseok edit for stepcharging 20100506
+   		del_timer_sync(&chargingstep_timer);
+
 		if(charging_mode_get())
 		{
 			printk("Power off cause charger removed in LPM mode\n");
@@ -2890,13 +2926,21 @@ void maxim_vac_disconnect(void)
 void maxim_topoff_change(void)
 {
 	if(curent_device_type==PM_CHARGER_TA)
-	{
+	{	
+#if defined(CONFIG_S5PC110_T959_BOARD) 
+		Set_MAX8998_PM_REG(TP, 0x1); 
+#else
 		Set_MAX8998_PM_REG(TP, 0x0); 
+#endif
 		printk("%s dev: TA\n",__func__);
 	}
 	else if (curent_device_type==PM_CHARGER_USB_INSERT)
-	{
+	{	
+#if defined(CONFIG_S5PC110_T959_BOARD) 	
+		Set_MAX8998_PM_REG(TP, 0x2); 
+#else
 		Set_MAX8998_PM_REG(TP, 0x1); 
+#endif	
 		printk("%s dev: USB\n",__func__);
 	}
 	else
@@ -2924,7 +2968,10 @@ void maxim_low_battery_2nd(void) // 3.3v
 {
 	printk("%s\n",__func__);
 	wake_lock_timeout(&pmic_wake_lock, 30 * HZ);
-	low_battery_power_off();
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504	
+//	low_battery_power_off();
+	low_battery_flag = 1;
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504	
         //printk("battery voltage is under 3.3V\n");
 }
 void maxim_low_battery_1st(void) // 3.57V
@@ -3019,10 +3066,125 @@ extern int  FSA9480_PMIC_CP_USB(void);
 extern int askonstatus;
 extern int mtp_mode_on;
 
+// [[ junghyunseok edit for stepcharging 20100506
+
+/*===========================================================================
+// [[ junghyunseok edit for stepcharging workqueue function 20100517
+FUNCTION chargingstep_timer_func                                
+
+DESCRIPTION
+    to apply  step increment current 
+
+INPUT PARAMETERS
+
+RETURN VALUE
+
+DEPENDENCIES
+SIDE EFFECTS
+EXAMPLE 
+
+===========================================================================*/
+
+static void chargingstep_timer_func(unsigned long unused)
+{
+	//pr_info("[charing step]:%s  \n", __func__);
+
+	schedule_work(&stepcharging_work);
+}
+// ]] junghyunseok edit for stepcharging 20100506	   
+
+
+static void maxim_stepcharging_work(struct work_struct *work)
+{
+
+
+       stepchargingCount++; 
+	   
+	//pr_info("[BAT]:%s, stepchargingCount = %d\n", __func__, stepchargingCount);
+
+       if(curent_device_type == PM_CHARGER_TA)
+       {
+       	//pr_info("[BAT]:%s,PM_CHARGER_TA ,  stepchargingCount = %d\n", __func__, stepchargingCount);
+
+	      if(stepchargingCount == 1)				
+           	{            // 90mA
+	                     stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x00;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+				mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));				
+	        }
+	    else if(stepchargingCount == 2)
+			{             //380mA
+	            stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x01;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+				mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));				
+            }		 	
+	     else if(stepchargingCount == 3)
+		    {             //475mA
+			    stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x02;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+				mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));				
+		    }
+	    else if(stepchargingCount == 4)
+		    {             //600mA
+            	           stepchargingCount = 0;
+			    stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x05;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+		    }
+	     else
+		    {
+				stepchargingCount = 0;
+		    }
+       }		
+       else if(curent_device_type == PM_CHARGER_USB_INSERT)
+       {
+       	//pr_info("[BAT]:%s,PM_CHARGER_USB_INSERT ,  stepchargingCount = %d\n", __func__, stepchargingCount);
+       
+
+	      if(stepchargingCount == 1)				
+           	{            // 90mA
+	           		 stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x00;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+				mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));				
+		    }
+	    else if(stepchargingCount == 2)
+		    {             //380mA
+			    	stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x01;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+				mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));				
+		    }		 	
+	    else if(stepchargingCount == 3)
+		    {             //475mA
+            	           	stepchargingCount = 0;
+			    	stepchargingreg_buff[0] = (stepchargingreg_buff[0] & 0xF8) | 0x02;
+				Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 
+		    }
+	   else
+			{
+				stepchargingCount = 0;
+			}
+      	}	
+	else
+	{
+		Set_MAX8998_PM_REG(CHGENB, 0x1); //disable charge
+	}
+	
+}
+// ]] junghyunseok edit for stepcharging workqueue function 20100517
+
+void stepcharging_Timer_setup()
+{
+
+	INIT_WORK(&stepcharging_work, maxim_stepcharging_work);	// [[ junghyunseok edit for stepcharging workqueue function 20100517
+	setup_timer(&chargingstep_timer, chargingstep_timer_func, 0);
+}
+
 void maxim_charging_control(unsigned int dev_type  , unsigned int cmd, int uicharging)
 {
-	byte reg_buff[2];
+
+//	byte reg_buff[2];
 	int value;
+// [[junghyunseok edit to remove topoff 20100510	
+    byte  iTemp;
 	
 	if(!cmd) //disable
 	{
@@ -3031,44 +3193,121 @@ void maxim_charging_control(unsigned int dev_type  , unsigned int cmd, int uicha
 	}
 	else if(dev_type==PM_CHARGER_TA)
 	{
+// [[ junghyunseok edit for recharging and full charging 20100406
+#if defined(CONFIG_KEPLER_VER_B2) ||defined(CONFIG_T959_VER_B5)
+// 0x06 address
+              Get_MAX8998_PM_ADDR(IRQ3_REG_M, &iTemp, 1);
+//              printk("[POW] %s , read 06 iTemp = %x \n",__func__, iTemp);
+		if(iTemp == 0x0) 
+			     iTemp = 0xFB;  	  
+              iTemp = iTemp | TOPOFF_MASK_BIT;
+//              printk("[POW] %s , write 06 iTemp = %x \n",__func__, iTemp);
+		Set_MAX8998_PM_ADDR(IRQ3_REG_M, &iTemp, 1); //TOP-OFF INT disable 
+
+// 0x0D address
+              Get_MAX8998_PM_ADDR(CHGR2, &iTemp, 1);
+//              printk("[POW] %s , read 0D iTemp = %x \n",__func__, iTemp);
+              iTemp = iTemp | 0x30;  // disable Fast charging Timer
+//              printk("[POW] %s , write 0D iTemp = %x \n",__func__, iTemp);
+		Set_MAX8998_PM_ADDR(CHGR2, &iTemp, 1); //TOP-OFF INT disable 
+
+		stepchargingreg_buff[0] = (0x0 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=10%, CHG_RST_HYS=disable, AC_FCGH= 600mA
+// ]]junghyunseok edit to remove topoff 20100510
+#else
+	
 		if(uicharging)
-			reg_buff[0] = (0x0 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=10%, CHG_RST_HYS=disable, AC_FCGH= 600mA
+#if defined(CONFIG_S5PC110_T959_BOARD) 			
+			stepchargingreg_buff[0] = (0x1 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=15%, CHG_RST_HYS=disable, AC_FCGH= 600mA
+#else	
+			stepchargingreg_buff[0] = (0x0 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=10%, CHG_RST_HYS=disable, AC_FCGH= 600mA
+#endif
 		else
-			reg_buff[0] = (0x2 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=20%, CHG_RST_HYS=disable, AC_FCGH= 600mA
-		reg_buff[1] = (0x2<<6) |(0x2<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 10, FCHG_TMR=7Hr, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
-		Set_MAX8998_PM_ADDR(CHGR1, reg_buff, 2); 
-		//printk("%s TA charging enable \n",__func__);
+			stepchargingreg_buff[0] = (0x2 <<5) |(0x3 << 3) |(0x5<<0) ; // CHG_TOPOFF_TH=20%, CHG_RST_HYS=disable, AC_FCGH= 600mA
+#endif
+// [[junghyunseok edit to remove topoff 20100510
+		stepchargingreg_buff[1] = (0x2<<6) |(0x3<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 10, FCHG_TMR=Disable, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
+
+
+//	      printk("[STEPCharging ]  TA maxim_charging_control call  \n");
+// [[ junghyunseok edit for stepcharging of behold3 20100510
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_T959_BOARD) 	
+		//parkhj modify
+              // when power on booting 
+              stepchargingCount = 0;
+              mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));
+#else
+		stepchargingCount = 0;
+		Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 	
+#endif				  
 	}
 	else if(dev_type==PM_CHARGER_USB_INSERT)
 	{	
 		value = FSA9480_PMIC_CP_USB();
+// [[junghyunseok edit to remove topoff 20100510		
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+// 0x06 address
+              Get_MAX8998_PM_ADDR(IRQ3_REG_M, &iTemp, 1);
+//              printk("[POW] %s , read 06 iTemp = %x \n",__func__, iTemp);
+		if(iTemp == 0x0) 
+			     iTemp = 0xFB;  	  
+              iTemp = iTemp | TOPOFF_MASK_BIT;
+//              printk("[POW] %s , write 06 iTemp = %x \n",__func__, iTemp);
+		Set_MAX8998_PM_ADDR(IRQ3_REG_M, &iTemp, 1); //TOP-OFF INT disable 
+
+// 0x0D address
+              Get_MAX8998_PM_ADDR(CHGR2, &iTemp, 1);
+//              printk("[POW] %s , read 0D iTemp = %x \n",__func__, iTemp);
+              iTemp = iTemp | 0x30;  // disable Fast charging Timer
+//              printk("[POW] %s , write 0D iTemp = %x \n",__func__, iTemp);
+		Set_MAX8998_PM_ADDR(CHGR2, &iTemp, 1); //TOP-OFF INT disable 
+// ]]junghyunseok edit to remove topoff 20100510
+		stepchargingreg_buff[0] = (0x1 <<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=10%, CHG_RST_HYS=disable, AC_FCGH= 475mA		
+#else		
+	
 		if(uicharging)
-			reg_buff[0] = (0x1<<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=15%, CHG_RST_HYS=disable, AC_FCGH= 475mA
+#if defined(CONFIG_S5PC110_T959_BOARD) 					
+			stepchargingreg_buff[0] = (0x2<<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=20%, CHG_RST_HYS=disable, AC_FCGH= 475mA
+#else
+			stepchargingreg_buff[0] = (0x1<<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=15%, CHG_RST_HYS=disable, AC_FCGH= 475mA
+#endif
 		else
-			reg_buff[0] = (0x3 <<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=25%, CHG_RST_HYS=disable, AC_FCGH= 475mA
+			stepchargingreg_buff[0] = (0x3 <<5) |(0x3 << 3) |(0x2<<0) ; // CHG_TOPOFF_TH=25%, CHG_RST_HYS=disable, AC_FCGH= 475mA
+#endif
+// [[junghyunseok edit to remove topoff 20100510
 		if(value)
 		{
-			if (askonstatus||mtp_mode_on){
-				reg_buff[1] = (0x1<<6) |(0x2<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 01, FCHG_TMR=7Hr, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
-				printk("[Max8998_function]AP USB Power OFF, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
+			if (askonstatus||mtp_mode_on){			
+				stepchargingreg_buff[1] = (0x1<<6) |(0x3<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 01, FCHG_TMR=disable, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
+				//printk("[Max8998_function]AP USB Power OFF, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
 				}
 			else{
-				reg_buff[1] = (0x2<<6) |(0x2<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 10, FCHG_TMR=7Hr, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
-				printk("[Max8998_function]AP USB Power ON, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
+				stepchargingreg_buff[1] = (0x2<<6) |(0x3<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 10, FCHG_TMR=disable, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
+				//printk("[Max8998_function]AP USB Power ON, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
 				}
 		}
 		else
-			reg_buff[1] = (0x2<<5) |(0x2<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 01, FCHG_TMR=7Hr, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
-			
-		Set_MAX8998_PM_ADDR(CHGR1, reg_buff, 2); 
-		//printk("%s USB charging enable \n",__func__);
+			stepchargingreg_buff[1] = (0x2<<5) |(0x3<<4) | (0x0<<3) | (0x0<<1) | (0x0<<0); //ESAFEOUT1,2= 01, FCHG_TMR=disable, MBAT_REG_TH=4.2V, MBATT_THERM_REG=105C
+// ]]junghyunseok edit to remove topoff 20100510
+
+//	      printk("[STEPCharging ]  USB  maxim_charging_control call  \n");
+// [[ junghyunseok edit for stepcharging of behold3 20100510
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_T959_BOARD) 	
+		// when power on booting 
+		stepchargingCount = 0;
+		mod_timer(&chargingstep_timer, jiffies + msecs_to_jiffies(CHARGINGSTEP_INTERVAL));
+#else
+		stepchargingCount = 0;
+		Set_MAX8998_PM_ADDR(CHGR1, stepchargingreg_buff, 2); 	
+#endif	
 	}
 	else
 	{
+		stepchargingCount = 0;
 		Set_MAX8998_PM_REG(CHGENB, 0x1); //disable charge
 		//printk("%s charging disable \n",__func__);
 	}
 }
+// ]] junghyunseok edit for stepcharging 20100506
 
 void maxim_batt_check(void)
 {

@@ -101,7 +101,11 @@ static struct s3c2410_uartcfg smdkc110_uartcfgs[] __initdata = {
 		.flags	     = 0,
 		.ucon	     = S3C64XX_UCON_DEFAULT,
 		.ulcon	     = S3C64XX_ULCON_DEFAULT,
+#ifdef CONFIG_S5PC110_T959_BOARD
+		.ufcon		 = S3C2410_UFCON_FIFOMODE | S3C2440_UFCON_TXTRIG10 | S3C2440_UFCON_RXTRIG4, // -> RX trigger leve : 8byte.
+#else
 		.ufcon	     = S3C64XX_UFCON_DEFAULT,
+#endif 
 		.clocks      = smdkc110_serial_clocks,
 		.clocks_size = ARRAY_SIZE(smdkc110_serial_clocks),
 	},
@@ -305,7 +309,12 @@ void otg_phy_init(void)
 EXPORT_SYMBOL(otg_phy_init);
 
 /* USB Control request data struct must be located here for DMA transfer */
-struct usb_ctrlrequest usb_ctrl __attribute__((aligned(8)));
+
+// Y.J Jung fix (5/15/2010)
+//struct usb_ctrlrequest usb_ctrl __attribute__((aligned(8)));
+struct usb_ctrlrequest usb_ctrl __attribute__((aligned(64)));
+int guard_dma_usb_ctrl __attribute__((aligned(64)));
+
 EXPORT_SYMBOL(usb_ctrl);
 
 /* OTG PHY Power Off */

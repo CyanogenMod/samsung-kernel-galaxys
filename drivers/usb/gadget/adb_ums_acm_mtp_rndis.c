@@ -85,7 +85,14 @@ void get_usb_serial(char *usb_serial_number)
 	
 	serial_number = (system_serial_high << 16) + (system_serial_low >> 16);
 
-	sprintf(temp_serial_number,"9000%08x",serial_number);
+#if defined(CONFIG_S5PC110_T959_BOARD)
+	sprintf(temp_serial_number,"T959%08x",serial_number);
+#elif defined(CONFIG_S5PC110_KEPLER_BOARD)
+	sprintf(temp_serial_number,"I897%08x",serial_number);
+#else
+	 sprintf(temp_serial_number,"9000%08x",serial_number);
+#endif
+
 	strcpy(usb_serial_number,temp_serial_number);
 }
 
@@ -487,7 +494,9 @@ static int __init android_bind(struct usb_composite_dev *cdev)
 	printk("[ADB_UMS_ACM_RNDIS_MTP] string_dev = %s \n",strings_dev[STRING_SERIAL_IDX].s);
 
 	device_desc.iSerialNumber = id;
+	device_desc.bcdDevice = cpu_to_le16(0x0400);
 
+#if 0
 	gcnum = usb_gadget_controller_number(gadget);
 	if (gcnum >= 0)
 	{
@@ -505,6 +514,7 @@ static int __init android_bind(struct usb_composite_dev *cdev)
 			longname, gadget->name);
 		device_desc.bcdDevice = __constant_cpu_to_le16(0x9999);
 	}
+#endif
 	
 	if (gadget_is_otg(cdev->gadget)) 
 		android_config.descriptors = otg_desc;
@@ -616,7 +626,7 @@ recheck:
 			dev->adb_enabled = enable;
 		}
 		else if(enable == USBSTATUS_ASKON)
-		{
+		{		
 			printk("[enable_adb]USBSTATUS_ASKON\n");
 			mtp_mode_on = 0;
 			askonstatus=1;
@@ -721,8 +731,8 @@ static void enable_askon(struct android_dev *dev, int enable)
 	usb_gadget_disconnect(dev->cdev->gadget);
 	}
 
-	oldusbstatus = currentusbstatus;
-	currentusbstatus=enable;
+oldusbstatus = currentusbstatus;
+currentusbstatus=enable;
 
 
 		/* set product ID to the appropriate value */
@@ -790,9 +800,9 @@ static void enable_askon(struct android_dev *dev, int enable)
 		ap_usb_power_on(1);
 	
 		if (dev->cdev && dev->cdev->gadget ) {
-	          usb_gadget_connect(dev->cdev->gadget);
+             usb_gadget_connect(dev->cdev->gadget);
            	}
-}
+		}
 
 void askon_gadget_disconnect(void)
 {

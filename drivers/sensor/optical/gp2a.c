@@ -235,7 +235,7 @@ static void gp2a_work_func_light(struct work_struct *work)
 	state_type level_state = LIGHT_INIT;
 
 	int val = 0;
-
+	
 	/* read adc data from s5p110 */
 	adc = lightsensor_get_adcvalue();
 	gprintk("Optimized adc = %d \n",adc);
@@ -243,15 +243,15 @@ static void gp2a_work_func_light(struct work_struct *work)
 	gprintk("light_enable = %d\n",light_enable);
 #if 0
 	if(adc >= 1500)
-		level_state = LIGHT_LEVEL3;
-
+				level_state = LIGHT_LEVEL3;
+			
 	else if(adc >= 100 && adc < 1500){
-		level_state = LIGHT_LEVEL2;
-	}
+				level_state = LIGHT_LEVEL2;
+			}
 
 	else if(adc < 100){
-		level_state = LIGHT_LEVEL1;
-	}
+				level_state = LIGHT_LEVEL1;
+			}
 #else
 	if(adc >= 2100)
 	{
@@ -267,10 +267,10 @@ static void gp2a_work_func_light(struct work_struct *work)
 			buffering = 4;
 		}
 		else if((buffering == 1)||(buffering == 2)||(buffering == 3))
-		{
-			level_state = LIGHT_LEVEL3;
-			buffering = 3;
-		}
+	{
+		level_state = LIGHT_LEVEL3;
+		buffering = 3;
+	}
 	}
 	
 	else if(adc >= 1800 && adc < 1900)
@@ -284,12 +284,12 @@ static void gp2a_work_func_light(struct work_struct *work)
 		{	
 			level_state = LIGHT_LEVEL3;
 			buffering = 3;
-		}
+	}
 		else if((buffering == 1)||(buffering == 2))
 		{
 			level_state = LIGHT_LEVEL2;
 			buffering = 2;
-		}
+	}
 	}
 
 	else if(adc >= 500 && adc < 1200)
@@ -297,21 +297,21 @@ static void gp2a_work_func_light(struct work_struct *work)
 		level_state = LIGHT_LEVEL2;
 		buffering = 2;
 	}
-	
+
 	else if(adc >= 80 && adc < 500)
 	{
 		if((buffering == 2)||(buffering == 3)||(buffering == 4))
 		{	
 			level_state = LIGHT_LEVEL2;
 			buffering = 2;
-		}
+	}
 		else if(buffering == 1)
 		{
 			level_state = LIGHT_LEVEL1;
 			buffering = 1;
-		}
 	}
-
+	}
+	
 	else if(adc < 80)
 	{
 		level_state = LIGHT_LEVEL1;
@@ -327,11 +327,11 @@ static void gp2a_work_func_light(struct work_struct *work)
 	if(autobrightness_mode)
 	{
 		if((pre_val!=1)&&(current_gamma_value == 24)&&(level_state == LIGHT_LEVEL4)&&(current_mDNIe_UI == mDNIe_UI_MODE))
-		{	
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[1]);
+		{
+						mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[1]);
 			pre_val = 1;
-			gprintk("mDNIe_Mode_set_for_backlight - pmDNIe_Gamma_set[1]\n" );
-		}
+						gprintk("mDNIe_Mode_set_for_backlight - pmDNIe_Gamma_set[1]\n" );
+					}
 	}
 #endif
 		
@@ -515,7 +515,7 @@ irqreturn_t gp2a_irq_handler(int irq, void *dev_id)
 	char value;
 	value = gpio_get_value(GPIO_PS_VOUT);
 
-	wake_lock_timeout(&prx_wake_lock, 3*HZ);
+	wake_lock_timeout(&prx_wake_lock, 5*HZ);
 	printk("[PROXIMITY] IRQ_HANDLED %d \n", value);
 	return IRQ_HANDLED;
 }
@@ -624,17 +624,17 @@ int opt_i2c_write( u8 reg, u8 *val )
 
     while(retry--)
     {
-        data[0] = reg;
-        data[1] = *val;
+    data[0] = reg;
+    data[1] = *val;
 
-        msg->addr = opt_i2c_client->addr;
-        msg->flags = I2C_M_WR;
-        msg->len = 2;
-        msg->buf = data;
+    msg->addr = opt_i2c_client->addr;
+    msg->flags = I2C_M_WR;
+    msg->len = 2;
+    msg->buf = data;
 
-        err = i2c_transfer(opt_i2c_client->adapter, msg, 1);
+    err = i2c_transfer(opt_i2c_client->adapter, msg, 1);
 
-        if (err >= 0) return 0;
+    if (err >= 0) return 0;
     }
     printk("%s %d i2c transfer error\n", __func__, __LINE__);
     return err;
@@ -764,7 +764,7 @@ static void gp2a_off(struct gp2a_data *gp2a, int type)
 		opt_i2c_write((u8)(REGS_OPMOD),&value);
 		
 		proximity_enable =0;
-		proximity_value = 0;
+		proximity_value = 0;		
 		#endif
 	}
 
@@ -773,6 +773,7 @@ static void gp2a_off(struct gp2a_data *gp2a, int type)
 		gprintk("[LIGHT_SENSOR] timer cancel for light sensor\n");
 		hrtimer_cancel(&gp2a->timer);
 		light_enable = OFF;
+
 	}
 }
 
@@ -856,7 +857,7 @@ static ssize_t lightsensor_file_state_store(struct device *dev,
 		#ifdef MDNIE_TUNINGMODE_FOR_BACKLIGHT
 		if(pre_val==1)
 		{
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
+		mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
 		}	
 		pre_val = -1;
 		#endif
@@ -1165,7 +1166,7 @@ static int gp2a_opt_resume( struct platform_device* pdev )
 	{
 		#if 0
 		gprintk("[%s] : hrtimer_start \n",__func__);
-	       light_polling_time = ktime_set(0,0);
+	    light_polling_time = ktime_set(0,0);
 		light_polling_time = ktime_add_us(light_polling_time,500000);
 		hrtimer_start(&gp2a->timer,light_polling_time,HRTIMER_MODE_REL);
 		#endif
@@ -1217,7 +1218,7 @@ static ssize_t light_read(struct file *filp, double *lux, size_t count, loff_t *
 	lux_val = StateToLux(cur_state);
 	//printk("GP2A: light_read(): cur_state = %d\n",cur_state);
 	put_user(lux_val, lux);
-	
+
 	return 1;
 }
 

@@ -168,6 +168,80 @@ config DDR_RAM_2G
                                         
 endchoice
 
+choice
+	prompt "Select NA USA BOARD TYPE "
+
+config S5PC110_KEPLER_BOARD
+	bool "S5PC110_KEPLER"
+	help
+		select NA USA Board 
+
+config S5PC110_T959_BOARD
+	bool "S5PC110_T959"
+	help
+		select NA USA Board 
+
+config S5PC110_FLEMING_BOARD
+	bool "S5PC110_FLEMING"
+	help
+		select NA USA Board 
+endchoice
+
+choice 
+        prompt "Select KEPLER BOARD VERSION "
+config KEPLER_VER_B0
+        bool "add KEPLER VERSION B0"
+        depends on S5PC110_KEPLER_BOARD
+        help
+         add kepler ver B0 option 
+
+config KEPLER_VER_B2
+        bool "add KEPLER VERSION B2"
+        depends on S5PC110_KEPLER_BOARD
+        help
+         add kepler ver B2 option 
+         
+config KEPLER_VER_B3
+        bool "add KEPLER VERSION B3"
+        depends on S5PC110_KEPLER_BOARD
+        help
+         add kepler ver B3 option         
+         
+endchoice 
+
+choice 
+	prompt "Select T959 BOARD VERSION"
+	
+config BEHOLD3_VER_B0
+        bool "add BEHOLD3 VERSION"
+        depends on S5PC110_T959_BOARD
+        help
+         add behold3 ver B0 option 
+         
+config T959_VER_B0
+        bool "add T959 VERSION"
+         depends on S5PC110_T959_BOARD
+        help
+         add T959 ver B0 option 
+
+config T959_VER_B5
+        bool "add T959 VERSION"
+         depends on S5PC110_T959_BOARD
+        help
+         add T959 ver B5 option 
+         
+endchoice 
+
+choice 
+	prompt "Select FLEMING BOARD VERSION"
+         
+config FLEMING_VER_B0
+        bool "add FLEMING VERSION"
+         depends on S5PC110_FLEMING_BOARD
+        help
+         add FLEMING ver B0 option 
+endchoice 
+
 config SEC_HEADSET
         tristate "SEC 2 Wire detection driver"
         default n

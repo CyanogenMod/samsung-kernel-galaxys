@@ -557,6 +557,9 @@ static void mmc_resume(struct mmc_host *host)
 {
 	int err;
 
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+	mutex_lock(&host->carddetect_lock); 
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
 	BUG_ON(!host);
 	BUG_ON(!host->card);
 
@@ -571,6 +574,9 @@ static void mmc_resume(struct mmc_host *host)
 		mmc_detach_bus(host);
 		mmc_release_host(host);
 	}
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+	mutex_unlock(&host->carddetect_lock);
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
 
 }
 

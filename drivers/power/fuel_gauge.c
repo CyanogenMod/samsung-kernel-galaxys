@@ -28,6 +28,9 @@ static struct i2c_client_address_data fg_addr_data = {
 };
 
 static int is_reset_soc = 0;
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+static int rcomp_status;
+static int ce_for_fuelgauge = 0;
 
 static int fg_i2c_read(struct i2c_client *client, u8 reg, u8 *data)
 {
@@ -97,6 +100,61 @@ unsigned int fg_read_vcell(void)
 	return vcell;
 }
 
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)
+unsigned int fg_read_soc(void)
+{
+	 struct i2c_client *client = fg_i2c_client;
+	 u8 data[2];
+	 int FGPureSOC = 0;
+	 int FGAdjustSOC = 0;
+	 int FGSOC = 0;
+
+	 if(fg_i2c_client==NULL)
+		  return -1;
+	 if (fg_i2c_read(client, SOC0_REG, &data[0]) < 0) {
+		  pr_err("%s: Failed to read SOC0\n", __func__);
+		  return -1;
+	 }
+	 if (fg_i2c_read(client, SOC1_REG, &data[1]) < 0) {
+		  pr_err("%s: Failed to read SOC1\n", __func__);
+		  return -1;
+	 }
+ 
+	 // calculating soc
+	 FGPureSOC = data[0]*100+((data[1]*100)/256);
+	 	 
+	 if(ce_for_fuelgauge){
+		 FGAdjustSOC = ((FGPureSOC - 130)*10000)/9720; // (FGPureSOC-EMPTY(1.2))/(FULL-EMPTY(?))*100
+	 }
+	 else{
+		 FGAdjustSOC = ((FGPureSOC - 130)*10000)/9430; // (FGPureSOC-EMPTY(1.2))/(FULL-EMPTY(?))*100
+	 }
+
+//	 printk("\n[FUEL] PSOC = %d, ASOC = %d\n", FGPureSOC, FGAdjustSOC);
+	 
+	 // rounding off and Changing to percentage.
+	 FGSOC=FGAdjustSOC/100;
+
+	if((FGSOC==4)&&FGAdjustSOC%100 >= 80){
+		FGSOC+=1;
+	 	}
+	 if((FGSOC== 0)&&(FGAdjustSOC>0)){
+	       FGSOC = 1;  
+	 	}
+	 if(FGAdjustSOC <= 0){
+	       FGSOC = 0;  	 	
+	 	}
+	 if(FGSOC>=100)
+	 {
+		  FGSOC=100;
+	 }
+	 
+ return FGSOC;
+ 
+}
+
+#else
+
 unsigned int fg_read_soc(void)
 {
 	struct i2c_client *client = fg_i2c_client;
@@ -159,6 +217,7 @@ unsigned int fg_read_soc(void)
 	return FGSOC;
 	
 }
+#endif
 
 unsigned int fg_reset_soc(void)
 {
@@ -180,14 +239,49 @@ unsigned int fg_reset_soc(void)
 	return ret;
 }
 
-void fuel_gauge_rcomp(void)
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+void fuel_gauge_rcomp(int mode)
 {
 	struct i2c_client *client = fg_i2c_client;
 	u8 rst_cmd[2];
 	s32 ret = 0;
+
+	printk("fuel_gauge_rcomp %d\n",mode);
 	
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || defined(CONFIG_S5PC110_FLEMING_BOARD)	
+	#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+		switch (mode) {
+			case FUEL_INT_1ST:
+				rst_cmd[0] = 0xD0;
+				rst_cmd[1] = 0x10; // 15%
+				rcomp_status = 0;
+				break;		
+			case FUEL_INT_2ND:
+				rst_cmd[0] = 0xD0;
+				rst_cmd[1] = 0x1A; // 5%
+				rcomp_status = 1;
+				break;
+			case FUEL_INT_3RD:
+				rst_cmd[0] = 0xD0;
+				rst_cmd[1] = 0x1E; // 1%
+				rcomp_status = 2;
+				break;
+// [[ junghyunseok edit for exception code 20100511		
+			default:
+				rst_cmd[0] = 0xD0;
+				rst_cmd[1] = 0x1E; // 1%
+				rcomp_status = 2;				
+				break;		
+// ]] junghyunseok edit for exception code 20100511
+		}
+	#else	
+		rst_cmd[0] = 0xD0;
+		rst_cmd[1] = 0x00;
+	#endif	
+#else
 	rst_cmd[0] = 0xB0;
 	rst_cmd[1] = 0x00;
+#endif
 
 	ret = fg_i2c_write(client, RCOMP0_REG, rst_cmd);
 	if (ret)
@@ -195,7 +289,7 @@ void fuel_gauge_rcomp(void)
 	
 	//msleep(500);
 }
-
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 
 static int fg_attach(struct i2c_adapter *adap, int addr, int kind)
 {

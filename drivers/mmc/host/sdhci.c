@@ -612,8 +612,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_data *data)
 #endif
 
 	if (count >= 0xF) {
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging
+		/*
 		printk(KERN_WARNING "%s: Too large timeout requested!\n",
 			mmc_hostname(host->mmc));
+		*/
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging
 		count = 0xE;
 	}
 

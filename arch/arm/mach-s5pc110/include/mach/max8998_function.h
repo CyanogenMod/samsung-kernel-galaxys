@@ -599,11 +599,19 @@ typedef enum {
                  IRQ1_BIT1_MASK_BIT | IRQ1_BIT0_MASK_BIT)
 #define IRQ2_M ( IRQ2_BIT7_MASK_BIT | IRQ2_BIT6_MASK_BIT | IRQ2_BIT5_MASK_BIT | IRQ2_BIT4_MASK_BIT | \
                  ALARM0_MASK_BIT | ALARM1_MASK_BIT | SMPLEVNT_MASK_BIT | WTSREVNT_MASK_BIT)
+// [[junghyunseok edit to remove topoff 20100510
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)				 
+#define IRQ3_M ( CHGFAULT_MASK_BIT | IRQ3_BIT6_MASK_BIT | DONER_MASK_BIT | CHGRSTF_MASK_BIT | \
+                 DCINOVP_MASK_BIT | TOPOFF_MASK_BIT | IRQ3_BIT1_MASK_BIT | ONKEY1S_MASK_BIT )
+#define IRQ4_M ( IRQ4_BIT7_MASK_BIT | IRQ4_BIT6_MASK_BIT | IRQ4_BIT5_MASK_BIT | IRQ4_BIT4_MASK_BIT | \
+                 IRQ4_BIT3_MASK_BIT | IRQ4_BIT2_MASK_BIT | LOBAT2_MASK_BIT | LOBAT1_MASK_BIT )			 
+#else
 #define IRQ3_M ( CHGFAULT_MASK_BIT | IRQ3_BIT6_MASK_BIT | DONER_MASK_BIT | CHGRSTF_MASK_BIT | \
                  DCINOVP_MASK_BIT | IRQ3_BIT1_MASK_BIT | ONKEY1S_MASK_BIT )
-
 #define IRQ4_M ( IRQ4_BIT7_MASK_BIT | IRQ4_BIT6_MASK_BIT | IRQ4_BIT5_MASK_BIT | IRQ4_BIT4_MASK_BIT | \
                  IRQ4_BIT3_MASK_BIT | IRQ4_BIT2_MASK_BIT)
+#endif
+// ]]junghyunseok edit to remove topoff 20100510
 
 // PM register
 #define ONOFF1_REG      0x11
@@ -683,6 +691,8 @@ typedef enum {
 #define LBCNFG_REG      0x0F
 
 #define CHGR1   0x0C
+// [[junghyunseok edit to remove topoff 20100510
+#define CHGR2   0x0D
 //===========================================================================
 // 
 //  MAX8998 RTC Section
@@ -1768,5 +1778,8 @@ unsigned int max8998_poweron_reason(void);
 unsigned char maxim_vf_status(void);
 void boot_charging_full_charging_clear(void);
 void maxim_charging_control(unsigned int dev_type  , unsigned int cmd, int uicharging);
+
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+static int low_battery_flag = 0;
 
 #endif  // MAX8998

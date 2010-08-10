@@ -49,6 +49,7 @@ struct sec_jack_port
 {
 	struct sec_gpio_info	det_jack;
 	struct sec_gpio_info	send_end;
+	struct sec_gpio_info send_end35;
 };
 
 struct sec_jack_platform_data
@@ -58,5 +59,8 @@ struct sec_jack_platform_data
 };
 
 unsigned int get_headset_status(void);
-
+void select_gpio_earmic_bias(void); //hdlnc_ysyim_2010-05-04
+void select_enable_irq(void);
+void select_disable_irq(void);	
+int get_gpio_send_end_state(void);
 #endif

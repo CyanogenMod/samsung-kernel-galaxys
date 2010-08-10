@@ -736,7 +736,7 @@ int s5p_domain_off_check(unsigned int power_domain)
     {
 	case S5PC110_POWER_DOMAIN_MFC: //MFC off
 		if (!(readl(S5P_CLKGATE_IP0) & POWER_DOMAIN_MFC_CLOCK_SET))
-        {	
+	        {	
 			if(!(g_power_domain_lock_token & MFC_DOMAIN_LOCK_TOKEN))
 				poweroff = 1;
 		}
@@ -744,7 +744,7 @@ int s5p_domain_off_check(unsigned int power_domain)
 
 	case S5PC110_POWER_DOMAIN_G3D: //G3D off
 		if (!(readl(S5P_CLKGATE_IP0) & POWER_DOMAIN_G3D_CLOCK_SET))
-        {
+	        {
 			if(!(g_power_domain_lock_token & G3D_DOMAIN_LOCK_TOKEN))
 #if 1 // for g3d power gating test on g3d driver			
 				poweroff = 1;
@@ -756,7 +756,7 @@ int s5p_domain_off_check(unsigned int power_domain)
 
 	case S5PC110_POWER_DOMAIN_LCD: //LCD off
 		if (!(readl(S5P_CLKGATE_IP1) & POWER_DOMAIN_LCD_CLOCK_SET))
-        {
+	        {
 			if(!(g_power_domain_lock_token & (LCD_DOMAIN_LOCK_TOKEN_SET)))
 				poweroff = 1;
 		}
@@ -764,7 +764,7 @@ int s5p_domain_off_check(unsigned int power_domain)
 
 	case S5PC110_POWER_DOMAIN_TV: //TV off
 		if (!(readl(S5P_CLKGATE_IP1) & POWER_DOMAIN_TV_CLOCK_SET))
-        {
+	        {
 			if(!(g_power_domain_lock_token & (TV_DOMAIN_LOCK_TOKEN_SET)))
 				poweroff = 1;
 		}
@@ -1220,6 +1220,10 @@ extern short gp2a_get_proximity_enable(void);
  * central control for sleep/resume process
 */
 
+extern unsigned int is_calling_or_playing;
+#define IS_VOICE_CALL_2G		(0x1 << 4)
+#define IS_VOICE_CALL_3G		(0x1 << 5)
+#define IS_DATA_CALL		(0x1 << 6)
 
 static int s5pc11x_pm_enter(suspend_state_t state)
 {
@@ -1286,7 +1290,12 @@ static int s5pc11x_pm_enter(suspend_state_t state)
 	/* Set wakeup mask regsiter */
 	__raw_writel(0xFFED, S5P_WAKEUP_MASK); 
 	} else {
-		__raw_writel(0xFFDD, S5P_WAKEUP_MASK); //0xFFDD:key, RTC_ALARM	
+
+		if((is_calling_or_playing & IS_VOICE_CALL_2G) || (is_calling_or_playing & IS_VOICE_CALL_3G) || (is_calling_or_playing & IS_DATA_CALL)){
+			__raw_writel(0xFFDD, S5P_WAKEUP_MASK); //0xFFDD:key, RTC_ALARM	
+		}else{
+		__raw_writel(0xFFFD, S5P_WAKEUP_MASK); //0xFFDD:key, RTC_ALARM	
+	}
 	}
 
 	__raw_writel(0xffffffff, S5PC110_VIC0REG(VIC_INT_ENABLE_CLEAR));
@@ -1316,12 +1325,56 @@ static int s5pc11x_pm_enter(suspend_state_t state)
 	/*Set EINT 22 as wake up source*/
 	s5pc11x_pm_set_eint(11, 0x2);
 	s5pc11x_pm_set_eint(22, 0x2);
+	s5pc11x_pm_set_eint(15, 0x4);
 	s5pc11x_pm_set_eint(21, 0x4);
 	s5pc11x_pm_set_eint(7,  0x02);		//PMIC	
 	s5pc11x_pm_set_eint(6, 0x4); //det_3.5
 
 	s5pc11x_pm_set_eint(28, 0x4);	// T_FLASH_DETECT
-
+//[hdlnc_bp_ytkwon : 20100326
+	#ifdef CONFIG_KEPLER_AUDIO_A1026
+		if(HWREV!=0x08)
+		{
+    			if(get_headset_status() & SEC_HEADSET_4_POLE_DEVICE)
+			{
+				s5pc11x_pm_set_eint(30, 0x4); //sendend
+				s5pc11x_pm_set_eint(18, 0x4); //sendend 2.5
+			}
+   			else
+   			{
+       			s5pc11x_pm_clear_eint(30);
+	   			s5pc11x_pm_clear_eint(18);
+   			}
+		}
+	#else
+		if(HWREV==0x0a ||HWREV==0x0c)
+		{
+   			if(get_headset_status() & SEC_HEADSET_4_POLE_DEVICE)
+			{
+				s5pc11x_pm_set_eint(30, 0x4); //sendend
+			}
+			else
+   			{
+     			s5pc11x_pm_clear_eint(30);
+       		}
+			
+		}
+		else
+		{
+   			if(get_headset_status() & SEC_HEADSET_4_POLE_DEVICE)
+			{
+				s5pc11x_pm_set_eint(30, 0x4); //sendend
+				s5pc11x_pm_set_eint(18, 0x4); //sendend 2.5
+			}
+   			else
+   			{
+	   			s5pc11x_pm_clear_eint(30);
+       			s5pc11x_pm_clear_eint(18);
+  			}
+		}
+	#endif
+//]hdlnc_bp_ytkwon : 20100326
+		
 	if(gp2a_get_proximity_enable())
 	{
 	    s5pc11x_pm_set_eint(2, 0x4);//proximity
@@ -1329,21 +1382,21 @@ static int s5pc11x_pm_enter(suspend_state_t state)
 	s5pc11x_pm_set_eint(20, 0x3);//WiFi
 	s5pc11x_pm_set_eint(23, 0x2);//microusb
 
-    	if(get_headset_status() & SEC_HEADSET_4_POLE_DEVICE)
-	{
-	    s5pc11x_pm_set_eint(30, 0x4); //sendend
-	}
-       else
-       {
-            s5pc11x_pm_clear_eint(30);
-       }
-
+#if defined CONFIG_T959_VER_B0
+	s5pc11x_pm_set_eint(29, 0x4);
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#elif defined CONFIG_KEPLER_VER_B0
+#elif defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+	s5pc11x_pm_set_eint(27, 0x2);
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#else	
 	//gpio key
 	if(HWREV >= 0xB)
 	{
 		s5pc11x_pm_set_eint(27, 0x4);
 		s5pc11x_pm_set_eint(29, 0x4);
 	}
+#endif
 	
 	if (!hw_version_check()) {
 	/*Set keypad as EINT for EVT0 wake up workaround*/

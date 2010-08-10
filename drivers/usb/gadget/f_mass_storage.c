@@ -1351,7 +1351,7 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
  }
 
  memset(buf, 0, 8); /* Non-removable, direct-access device */
- printk("[USB:UMS] Lun:%d\n", fsg->lun); 
+ //printk("[USB:UMS] Lun:%d\n", fsg->lun); 
 
  buf[1] = 0x80; /* set removable bit */
  buf[2] = 2;  /* ANSI SCSI level 2 */
@@ -1366,14 +1366,28 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
  {
   /* Internal Device : Phone, External Device : Card*/
   if(fsg->lun==0)
-  {  
+  {
+// [[ junghyunseok edit for showing right model name 20100506    
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)
+   sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "SGH-I897 Card", fsg->release);
+#elif (defined CONFIG_S5PC110_T959_BOARD)
+   sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "SGH-T959 Card", fsg->release);
+#else
    sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "GT-I9000 Card", fsg->release);
-   printk("[USB:UMS] Buf+8:%s\n", buf+8);
+#endif
+   //printk("[USB:UMS] Buf+8:%s\n", buf+8);
   }
   else
   {
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)
+   sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "SGH-I897       ", fsg->release);
+#elif (defined CONFIG_S5PC110_T959_BOARD)
+   sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "SGH-T959       ", fsg->release);
+#else
    sprintf(buf + 8, "%-8s%-16s%04x", "SAMSUNG ", "GT-I9000       ", fsg->release);
-   printk("[USB:UMS] Buf+8:%s\n", buf+8);
+#endif
+// ]] junghyunseok edit for showing right model name 20100506
+   //printk("[USB:UMS] Buf+8:%s\n", buf+8);
   }
  }
 #endif

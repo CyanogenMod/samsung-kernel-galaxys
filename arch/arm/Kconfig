@@ -149,6 +149,10 @@ config ZONE_DMA
 config GENERIC_ISA_DMA
 	bool
 
+config KEPLER_AUDIO_A1026
+	bool "A1026"
+	default n
+	
 config FIQ
 	bool
 

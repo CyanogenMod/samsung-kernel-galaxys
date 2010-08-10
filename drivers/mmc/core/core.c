@@ -118,9 +118,18 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 			cmd->resp[2], cmd->resp[3]);
 
 		if (mrq->data) {
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging	
+		/*
 			pr_debug("%s:     %d bytes transferred: %d\n",
 				mmc_hostname(host),
 				mrq->data->bytes_xfered, mrq->data->error);
+		*/
+			if(mrq->data->error != 0){
+			printk(KERN_WARNING "%s:     %d bytes transferred: %d\n",
+					mmc_hostname(host),
+					mrq->data->bytes_xfered, mrq->data->error);
+			}
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100507 : add LOG for MoviNAND debuging
 		}
 
 		if (mrq->stop) {
@@ -759,6 +768,9 @@ void mmc_rescan(struct work_struct *work)
 	u32 ocr;
 	int err;
 	int extend_wakelock = 0;
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+	mutex_lock(&host->carddetect_lock); 
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion	
 
 	mmc_bus_get(host);
 
@@ -787,6 +799,8 @@ void mmc_rescan(struct work_struct *work)
 
 
 	mmc_bus_get(host);
+
+	printk(KERN_DEBUG "*** DEBUG : start %s (mmc%d)***\n", __func__, host->index);
 
 	/* if there still is a card present, stop here */
 	if (host->bus_ops != NULL) {
@@ -846,6 +860,8 @@ void mmc_rescan(struct work_struct *work)
 		goto out;
 	}
 
+	printk(KERN_DEBUG "*** DEBUG : end %s (mmc%d)***\n", __func__, host->index);
+
 	mmc_release_host(host);
 	mmc_power_off(host);
 
@@ -860,6 +876,10 @@ out:
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
+//[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+	mutex_unlock(&host->carddetect_lock); 
+//]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
+
 }
 
 void mmc_start_host(struct mmc_host *host)
@@ -900,6 +920,8 @@ void mmc_stop_host(struct mmc_host *host)
 
 #ifdef CONFIG_PM
 
+int is_mmc_resume = 0;
+EXPORT_SYMBOL(is_mmc_resume);
 /**
  *	mmc_suspend_host - suspend a host
  *	@host: mmc host
@@ -929,6 +951,7 @@ int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 
 	if (host->skip_pwrmgt == 1) {
 		printk("mmc%d:mmc_suspend_host: skip mmc_power_off()\n", host->index);
+		is_mmc_resume = 1;
 	} else {
 		mmc_power_off(host);
 	}
@@ -964,6 +987,7 @@ int mmc_resume_host(struct mmc_host *host)
 	if (host->skip_pwrmgt != 1) {
 		mmc_detect_change(host, 1);
 	}
+	is_mmc_resume = 0;
 
 	return 0;
 }

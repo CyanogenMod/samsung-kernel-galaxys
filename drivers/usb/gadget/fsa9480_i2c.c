@@ -42,6 +42,7 @@ static u8 MicroUSBStatus=0;
 static u8 MicroJigUSBOnStatus=0;
 static u8 MicroJigUSBOffStatus=0;
 static u8 MicroJigUARTOffStatus=0;
+static u8 MicroJigUARTOnStatus=0;
 u8 MicroTAstatus=0;
 
 
@@ -121,7 +122,7 @@ EXPORT_SYMBOL(FSA9480_Get_DEV_TYP1);
 
 u8 FSA9480_Get_JIG_Status(void)
 {
-	if(MicroJigUSBOnStatus | MicroJigUSBOffStatus | MicroJigUARTOffStatus)
+	if(MicroJigUSBOnStatus | MicroJigUSBOffStatus | MicroJigUARTOnStatus | MicroJigUARTOffStatus)
 		return 1;
 	else
 		return 0;
@@ -158,7 +159,7 @@ EXPORT_SYMBOL(FSA9480_Get_TA_Status);
 
 u8 FSA9480_Get_JIG_UART_Status(void)
 {
-	if(MicroJigUARTOffStatus)
+	if(MicroJigUARTOnStatus | MicroJigUARTOffStatus)
 		return 1;
 	else
 		return 0;
@@ -237,21 +238,21 @@ void ap_usb_power_on(int set_vaue)
 		Get_MAX8998_PM_ADDR(reg_address, &reg_value, 1); // read 0x0D register
 		reg_value = reg_value | (0x1 << 7);
 		Set_MAX8998_PM_ADDR(reg_address,&reg_value,1);
-		printk("[ap_usb_power_on]AP USB Power ON, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
+		//printk("[ap_usb_power_on]AP USB Power ON, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
 			if(mtp_mode_on == 1) {
 				samsung_kies_mtp_mode_flag = 1;
-				printk("************ [ap_usb_power_on] samsung_kies_mtp_mode_flag:%d, mtp:%d\n", samsung_kies_mtp_mode_flag, mtp_mode_on);
+				//printk("************ [ap_usb_power_on] samsung_kies_mtp_mode_flag:%d, mtp:%d\n", samsung_kies_mtp_mode_flag, mtp_mode_on);
 			}
 			else {
 				samsung_kies_mtp_mode_flag = 0;
-				printk("!!!!!!!!!!! [ap_usb_power_on]AP samsung_kies_mtp_mode_flag%d, mtp:%d\n",samsung_kies_mtp_mode_flag, mtp_mode_on);
+				//printk("!!!!!!!!!!! [ap_usb_power_on]AP samsung_kies_mtp_mode_flag%d, mtp:%d\n",samsung_kies_mtp_mode_flag, mtp_mode_on);
 			}
 		}
 	else{
 		Get_MAX8998_PM_ADDR(reg_address, &reg_value, 1); // read 0x0D register
 		reg_value = reg_value & ~(0x1 << 7);
 		Set_MAX8998_PM_ADDR(reg_address,&reg_value,1);
-		printk("[ap_usb_power_on]AP USB Power OFF, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
+		//printk("[ap_usb_power_on]AP USB Power OFF, askon: %d, mtp : %d\n",askonstatus,mtp_mode_on);
 		}
 		
 }
@@ -299,7 +300,7 @@ void Ap_Cp_Switch_Config(u16 ap_cp_mode)
 			gpio_set_value(GPIO_UART_SEL, 0);			
 			break;
 		default:
-			printk("Ap_Cp_Switch_Config error");
+			break;//printk("Ap_Cp_Switch_Config error");
 	}
 		
 }
@@ -598,7 +599,7 @@ static ssize_t uart_switch_store(struct device *dev, struct device_attribute *at
 		uart_switching_value_update(SWITCH_PDA);
 		uart_current_owner = 1;		
 		switch_sel |= UART_SEL_MASK;
-		printk("[UART Switch] Path : PDA\n");	
+		//printk("[UART Switch] Path : PDA\n");	
 	}	
 
 	if (strncmp(buf, "MODEM", 5) == 0 || strncmp(buf, "modem", 5) == 0) {		
@@ -606,7 +607,7 @@ static ssize_t uart_switch_store(struct device *dev, struct device_attribute *at
 		uart_switching_value_update(SWITCH_MODEM);
 		uart_current_owner = 0;		
 		switch_sel &= ~UART_SEL_MASK;
-		printk("[UART Switch] Path : MODEM\n");	
+		//printk("[UART Switch] Path : MODEM\n");	
 	}
 
 	switching_value_update();	
@@ -640,7 +641,7 @@ static ssize_t DMport_switch_store(struct device *dev, struct device_attribute *
 			
 				fd = sys_open("/dev/dm", O_RDWR, 0);
 				if(fd < 0){
-				printk("Cannot open the file");
+				//printk("Cannot open the file");
 				return fd;}
 				for(i=0;i<5;i++)
 				{		
@@ -653,9 +654,9 @@ static ssize_t DMport_switch_store(struct device *dev, struct device_attribute *
 
 		if ((strncmp(buf, "logusb", 6) == 0)||(log_via_usb == log_usb_enable)) {		
 			log_via_usb = log_usb_active;
-				printk("denis_test_prink_log_via_usb_1\n");
+				//printk("denis_test_prink_log_via_usb_1\n");
 				mdelay(1000);
-				printk(KERN_INFO"%s: 21143 10baseT link beat good.\n", "denis_test");
+				//printk(KERN_INFO"%s: 21143 10baseT link beat good.\n", "denis_test");
 			set_fs(old_fs);				
 			}
 		return size;
@@ -689,17 +690,17 @@ static ssize_t DMlog_switch_store(struct device *dev, struct device_attribute *a
 {
 		if (strncmp(buf, "CPONLY", 6) == 0)
 		{
-			printk("DMlog selection : CPONLY\n");
+			//printk("DMlog selection : CPONLY\n");
 }
 
 		if (strncmp(buf, "APONLY", 6) == 0)
 		{
-			printk("DMlog selection : APONLY\n");
+			//printk("DMlog selection : APONLY\n");
 		}
 
 		if (strncmp(buf, "CPAP", 4) == 0)
 		{
-			printk("DMlog selection : AP+CP\n");
+			//printk("DMlog selection : AP+CP\n");
 		}
 		
 		
@@ -785,7 +786,7 @@ void PathSelStore(int sel)
 
 static ssize_t UsbMenuSel_switch_show(struct device *dev, struct device_attribute *attr, char *buf)
 {	
-
+		
 		if (currentusbstatus == USBSTATUS_UMS) 
 			return sprintf(buf, "%s[UsbMenuSel] UMS\n", buf);	
 		
@@ -912,20 +913,20 @@ static ssize_t Mtp_switch_show(struct device *dev, struct device_attribute *attr
 static ssize_t Mtp_switch_store(struct device *dev, struct device_attribute *attr,	const char *buf, size_t size)
 {		
 	
-	if (strncmp(buf, "Mtp", 3) == 0)
+		if (strncmp(buf, "Mtp", 3) == 0)
 		{
 			if(mtp_mode_on)
 				{
-				printk("[Mtp_switch_store]AP USB power on. \n");
+				//printk("[Mtp_switch_store]AP USB power on. \n");
 #ifdef VODA
 				askon_switch_select(USBSTATUS_SAMSUNG_KIES);
 #endif
 				ap_usb_power_on(1);
-				}
+			}
 		}
 	else if (strncmp(buf, "OFF", 3) == 0)
 		{
-				printk("[Mtp_switch_store]AP USB power off. \n");
+				//printk("[Mtp_switch_store]AP USB power off. \n");
 				usb_mtp_select(1);
 		}
 	return size;
@@ -1009,7 +1010,7 @@ void FSA9480_Enable_CP_USB(u8 enable)
 
 	if(enable)
 	{
-		printk("[FSA9480_Enable_CP_USB] Enable CP USB\n");
+		//printk("[FSA9480_Enable_CP_USB] Enable CP USB\n");
 		mdelay(10);
 		Get_MAX8998_PM_ADDR(reg_address, &reg_value, 1); // read 0x0D register
 		check_reg = reg_value;
@@ -1019,11 +1020,13 @@ void FSA9480_Enable_CP_USB(u8 enable)
 		check_reg = reg_value;
 			
 		mdelay(10);
-		printk("HWREV is 0x%x\n", HWREV);
-		if (HWREV >= 0x0d)
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, 0x48); // D+/- switching by Audio_L/R in HW04
+#ifdef CONFIG_S5PC110_T959_BOARD // not Kepler
+		//printk("HWREV is 0x%x\n", HWREV);		
+		if ((HWREV == 0x0d)||(HWREV == 0x0e)||(HWREV == 0x0f)||(HWREV == 0x10))
+		fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, 0x48); // D+/- switching by Audio_L/R in HW04
 		else
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, 0x90);	// D+/- switching by V_Audio_L/R in HW03
+#endif
+		fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, 0x90);	// D+/- switching by V_Audio_L/R in HW03
 
 		mdelay(10);
 		fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1A);	//manual switching
@@ -1031,7 +1034,7 @@ void FSA9480_Enable_CP_USB(u8 enable)
 	}
 	else
 	{
-		printk("[FSA9480_Enable_AP_USB] Enable AP USB\n");
+		//printk("[FSA9480_Enable_AP_USB] Enable AP USB\n");
 		Get_MAX8998_PM_ADDR(reg_address, &reg_value, 1); // read 0x0D register
 
 		if(askonstatus||mtp_mode_on)
@@ -1096,7 +1099,8 @@ void FSA9480_ProcessDevice(u8 dev1, u8 dev2, u8 attach)
 {
 
 	DEBUG_FSA9480("FSA9480_ProcessDevice function!!!!\n");
-	printk("[FSA9480]FSA INTR = dev1 : 0x%x, dev2 : 0x%x, Attach : 0x%x\n",dev1, dev2, attach);
+	// [[ junghyunseok edit for attach/dettach debug 20010617
+	printk("[FSA9480]FSA INTR = dev1 : 0x%x, dev2 : 0x%x , Attach : 0x%x\n",dev1, dev2, attach);
 	if(dev1)
 	{
 		switch(dev1)
@@ -1242,11 +1246,13 @@ void FSA9480_ProcessDevice(u8 dev1, u8 dev2, u8 attach)
 				if(attach & FSA9480_INT1_ATTACH)
 				{
 					DEBUG_FSA9480("FSA9480_DEV_TY2_JIG_UART_ON --- ATTACH\n");
+					MicroJigUARTOnStatus = 1;
 					car_vps_status_change(1);
 				}
 				else
 				{
 					DEBUG_FSA9480("FSA9480_DEV_TY2_JIG_UART_ON --- DETACH\n");
+					MicroJigUARTOnStatus = 0;
 					car_vps_status_change(0);
 				}
 				DEBUG_FSA9480("JIG UART ON \n");
@@ -1281,7 +1287,14 @@ void FSA9480_ProcessDevice(u8 dev1, u8 dev2, u8 attach)
 				DEBUG_FSA9480("AudioVideo \n");
 				if(attach & FSA9480_INT1_ATTACH){
 					DEBUG_FSA9480("FSA9480_DEV_TY2_AV --- ATTACH\n");
-					if (HWREV >= 0x0d){
+#if defined CONFIG_S5PC110_T959_BOARD
+					if(1)
+#elif defined CONFIG_S5PC110_KEPLER_BOARD
+					if (1)
+#else
+					if (HWREV == 0x0d)
+#endif
+						{
 						DEBUG_FSA9480("FSA9480_enable_spk\n");						
 						vps_status_change(1);
 						FSA9480_Enable_SPK(1);
@@ -1289,9 +1302,15 @@ void FSA9480_ProcessDevice(u8 dev1, u8 dev2, u8 attach)
 					}
 				else{
 					DEBUG_FSA9480("FSA9480_DEV_TY2_AV --- DETACH\n");
-					if (HWREV >= 0x0d)
+#if defined CONFIG_S5PC110_T959_BOARD
+					if(1)
+#elif defined CONFIG_S5PC110_KEPLER_BOARD
+					if (1)
+#else
+					if (HWREV == 0x0d)
+#endif
 						vps_status_change(0);
-			              }
+			            }
 			}
 			break;
 
@@ -1333,7 +1352,7 @@ void FSA9480_ReadIntRegister(void)
 		fsa9480_device2 = device2;
 		if(fsa9480_device1 != FSA9480_DEV_TY1_DED_CHG){
 			DEBUG_FSA9480("FSA9480_enable LDO8\n");
-			s3c_usb_cable(1);//mkh
+		s3c_usb_cable(1);//mkh
 			}
 		if(fsa9480_device1&FSA9480_DEV_TY1_CAR_KIT)
 		{
@@ -1515,7 +1534,7 @@ void connectivity_switching_init(struct work_struct *ignored)
 			usb_switching_value_update(SWITCH_PDA);
 			}
 		else{
-			if(MicroJigUARTOffStatus){
+			if(MicroJigUARTOffStatus || MicroJigUARTOnStatus){
 				Ap_Cp_Switch_Config(AP_USB_MODE);
 				}
 			else{
@@ -1541,10 +1560,16 @@ void connectivity_switching_init(struct work_struct *ignored)
 		switching_value_update();	
 
 	if((switch_sel == 1) || (factoryresetstatus == 0xAE)){
+#if defined(CONFIG_S5PC110_T959_BOARD)		
+		usb_switch_select(USBSTATUS_UMS);		
+		ap_usb_power_on(1);
+		UsbMenuSelStore(2);	
+#else			
 		usb_switch_select(USBSTATUS_SAMSUNG_KIES);
 		mtp_mode_on = 1;
 		ap_usb_power_on(0);
 		UsbMenuSelStore(0);	
+#endif	
 		}
 	else{
 		if(usb_sel){
@@ -1574,10 +1599,10 @@ void connectivity_switching_init(struct work_struct *ignored)
 		s3c_usb_cable(0);
 		}
 
-	printk("[FSA9480]connectivity_switching_init = switch_sel : 0x%x\n",switch_sel);
+	//printk("[FSA9480]connectivity_switching_init = switch_sel : 0x%x\n",switch_sel);
 	microusb_uart_status(1);
 	
-    connectivity_switching_init_state=1;
+	connectivity_switching_init_state=1;
 
 	//del_timer(&microusb_timer);
 	

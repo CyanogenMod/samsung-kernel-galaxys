@@ -58,7 +58,7 @@ config TOUCHSCREEN_CORGI
 	  NOTE: this driver is deprecated, try enable SPI and generic
 	  ADS7846-based touchscreen driver.
 
-config TOUCHSCREEN_QT602240
+menuconfig TOUCHSCREEN_QT602240
 	tristate "quantum touchscreen driver"
     depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC1XX || ARCH_S5PC11X
 	default N
@@ -70,6 +70,21 @@ config TOUCHSCREEN_QT602240
  
 	  To compile this driver as a module, choose M here: the
 	  module will be called melfas_ts.
+
+if TOUCHSCREEN_QT602240
+
+config CONFIG_KEPLER_TSP_VER3_5
+	bool "3.5 inch TSP"
+	default N
+	help
+	 Say Y here to enable 3.5 inch QTSP.
+
+	 If unsure, say N.
+
+endif
+	 
+
+
 
 config TOUCHSCREEN_MELFAS
 	tristate "melfas touchscreen driver"

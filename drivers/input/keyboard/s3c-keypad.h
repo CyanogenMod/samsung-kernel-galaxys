@@ -38,8 +38,16 @@ static void __iomem *key_base;
  #define KEYPAD_ROWS	3
  #define MAX_KEYPAD_NR	6
  #elif defined (CONFIG_ARIES_VER_B0) || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2)
-  #define KEYPAD_COLUMNS	3
- #define KEYPAD_ROWS	3
+	#if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined(CONFIG_S5PC110_T959_BOARD) 
+		#define KEYPAD_COLUMNS	2
+		#define KEYPAD_ROWS	3
+        #elif defined(CONFIG_FLEMING_VER_B0)
+                #define KEYPAD_COLUMNS	4
+                #define KEYPAD_ROWS 2
+	#else
+		#define KEYPAD_COLUMNS	3
+		#define KEYPAD_ROWS	3
+	#endif 
  #define MAX_KEYPAD_NR	9
 #else
 
@@ -87,9 +95,18 @@ int keypad_keycode[] = {
 		50,2,3,34,58,42,34,8,
 		26,10,11,50,13,14,50,16,
 #elif defined (CONFIG_ARIES_VER_B3)
+#if defined (CONFIG_T959_VER_B5)
+		50,0,0,0,42,58,
+#else
               50,0,0,0,58,42,
+#endif
+
 #elif defined(CONFIG_ARIES_VER_B0) || (defined CONFIG_ARIES_VER_B1)  || (defined CONFIG_ARIES_VER_B2)
+#if defined (CONFIG_FLEMING_VER_B0)
+		50,34,3,34,58,42,34,8,
+#else
 		50,2,3,34,58,42,34,8,
+#endif
 		26,10,11,50,13,14,50,16,
 #else // b3
 		50,2,3,4,34,58,42,8,

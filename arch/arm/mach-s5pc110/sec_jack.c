@@ -61,6 +61,11 @@
 
 #define WAKELOCK_DET_TIMEOUT	HZ * 5 //5 sec
 
+extern unsigned int HWREV;
+
+static unsigned int gpio_ear_mic_bias_en; //hdlnc_ysyim_2010-05-04: instead of GPIO_MICBIAS_EN
+static int adc_min,adc_max; //hdlnc_ysyim_2010-05-12
+
 static struct platform_driver sec_jack_driver;
 
 struct class *jack_class;
@@ -92,6 +97,131 @@ static unsigned int send_end_pressed = 0;
 static struct wake_lock jack_sendend_wake_lock;
 static int recording_status=0;
 static int send_end_irq_token=0;
+
+enum SENDENDSTATE {SENDENDOFF,SENDEND25,SENDEND35};
+enum SENDENDSTATE SendEnd_state=SENDENDOFF;
+
+
+
+//hdlnc_ysyim_2010-05-04
+void select_gpio_earmic_bias(void) 
+{
+
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)//Kepler
+ 	printk("Kepler ver:0x%x\n",HWREV);
+	if((HWREV == 0x04) || (HWREV == 0x08) || (HWREV == 0x0C) || (HWREV == 0x02) || (HWREV == 0x0A)) //0x08:00, 0x04:01, 0x0C:02, 0x02:03, 0x0A:04
+		gpio_ear_mic_bias_en=GPIO_MICBIAS_EN;
+	else // from 05 board (0x06: 05, 0x0E: 06)
+		gpio_ear_mic_bias_en=GPIO_EARMICBIAS_EN;	
+	
+#elif (defined CONFIG_S5PC110_T959_BOARD)//T959
+ 	printk("T959 ver:0x%x\n",HWREV);
+	if((HWREV == 0x0A) || (HWREV == 0x0C) || (HWREV == 0x0D) || (HWREV == 0x0E) ) //0x0A:00, 0x0C:00, 0x0D:01, 0x0E:05
+		gpio_ear_mic_bias_en=GPIO_MICBIAS_EN;	
+	else// from 06 board(0x0F: 06)
+		gpio_ear_mic_bias_en=GPIO_MICBIAS_EN2;		
+ #endif
+
+//slect 4 pold adc range value
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)//Kepler
+	adc_min=700;
+	adc_max=2500;
+#elif (defined CONFIG_S5PC110_T959_BOARD)//T959
+	if(HWREV==0x0a || HWREV==0x0c) 
+	{
+		
+		adc_min=1500;
+		adc_max=5000;		
+	}
+	else
+	{
+		adc_min=500;
+		adc_max=3300;	
+	}
+ #endif
+ 
+}
+
+void select_enable_irq(void)
+{
+	struct sec_gpio_info   *send_end = &hi->port.send_end;
+	struct sec_gpio_info   *send_end35 = &hi->port.send_end35;
+	
+#if defined(CONFIG_S5PC110_KEPLER_BOARD)//Kepler
+	if(HWREV!=0x08)
+	{
+		enable_irq (send_end->eint);
+		enable_irq (send_end35->eint);
+	}
+#elif (defined CONFIG_S5PC110_T959_BOARD)//T959
+	if(HWREV==0x0a ||HWREV==0x0c)
+	{				
+		enable_irq (send_end->eint);
+	}
+	else
+	{
+		enable_irq (send_end->eint);
+		enable_irq (send_end35->eint);
+	}
+#endif
+}
+
+void select_disable_irq(void)
+{
+	struct sec_gpio_info   *send_end = &hi->port.send_end;
+	struct sec_gpio_info   *send_end35 = &hi->port.send_end35;
+	
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) //Kepler
+	if(HWREV!=0x08)
+	{
+		disable_irq (send_end->eint); 
+		disable_irq (send_end35->eint);
+	}
+#elif (defined CONFIG_S5PC110_T959_BOARD)//T959
+	if(HWREV==0x0a ||HWREV==0x0c)
+	{
+		disable_irq (send_end->eint);
+	}
+	else
+	{
+		disable_irq (send_end->eint);
+		disable_irq (send_end35->eint);
+	}
+#endif
+			
+}
+
+int get_gpio_send_end_state(void)
+{
+	struct sec_gpio_info   *send_end = &hi->port.send_end;
+	struct sec_gpio_info   *send_end35 = &hi->port.send_end35;
+	int state,state_25,state_35;
+
+
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) //Kepler
+
+	state_25=gpio_get_value(send_end->gpio) ^ send_end->low_active;
+	state_35=gpio_get_value(send_end35->gpio) ^ send_end35->low_active;
+	state=(state_25|state_35);
+
+#elif (defined CONFIG_S5PC110_T959_BOARD) //T959
+	if(HWREV==0x0a ||HWREV==0x0c)
+	{
+
+		state = gpio_get_value(send_end->gpio) ^ send_end->low_active;
+	}
+	else
+	{
+		
+		state_25=gpio_get_value(send_end->gpio) ^ send_end->low_active;
+		state_35=gpio_get_value(send_end35->gpio) ^ send_end35->low_active;
+		state=(state_25|state_35); 
+		
+	}
+#endif	
+
+	return state;
+}
 
 unsigned int get_headset_status(void)
 {
@@ -166,6 +296,7 @@ void car_vps_status_change(int status)
 	switch_set_state(&switch_jack_detection, current_jack_type_status);
 }
 
+
 static int jack_type_detect_change(struct work_struct *ignored)
 {
 	int adc = 0;
@@ -184,6 +315,7 @@ static int jack_type_detect_change(struct work_struct *ignored)
 		{
 
 			adc = s3c_adc_get_adc_data(SEC_HEADSET_ADC_CHANNEL);
+			//printk("adc:%d\n",adc );
 			/*  unstable zone */
 			if(adc > 3250)
 			{
@@ -198,13 +330,13 @@ static int jack_type_detect_change(struct work_struct *ignored)
 					count_pole = 0;
 					if(send_end_irq_token==1)
 					{
-						disable_irq(send_end->eint);
+						select_disable_irq();
 						send_end_irq_token=0;
 					}
 					current_jack_type_status = SEC_HEADSET_3_POLE_DEVICE;
 					if(!get_recording_status())
 					{
-						gpio_set_value(GPIO_MICBIAS_EN, 0);
+						gpio_set_value(gpio_ear_mic_bias_en, 0);
 					}
 
 				}
@@ -217,17 +349,19 @@ static int jack_type_detect_change(struct work_struct *ignored)
 
 			}
 			/* 4 pole zone */
-			else if(adc > 2000)
+			//else if(adc > 2500)
+			else if(adc > adc_min && adc <=adc_max) //get_gpio_send_end_state CO¨ùo¢¯¢®¨ù¡© ¡ÆaA¢´		
 			{
 				current_jack_type_status = SEC_HEADSET_4_POLE_DEVICE;
 				printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] 4 pole  headset attached : adc = %d\n",__func__,__LINE__, adc);
 				bQuit = true;
 				if(send_end_irq_token==0)
 				{
-					enable_irq(send_end->eint);
+					select_enable_irq();
+				
 					send_end_irq_token=1;
 				}
-				gpio_set_value(GPIO_MICBIAS_EN, 1);
+				gpio_set_value(gpio_ear_mic_bias_en, 1);
 			}
 			/* unstable zone */
 			else if(adc > 600)
@@ -243,13 +377,13 @@ static int jack_type_detect_change(struct work_struct *ignored)
 					count_pole = 0;
 					if(send_end_irq_token==1)
 					{
-						disable_irq(send_end->eint);
+						select_disable_irq();
 						send_end_irq_token=0;
 					}
 					current_jack_type_status = SEC_HEADSET_3_POLE_DEVICE;
 					if(!get_recording_status())
 					{
-						gpio_set_value(GPIO_MICBIAS_EN, 0);
+						gpio_set_value(gpio_ear_mic_bias_en, 0);
 					}
 
 				}
@@ -271,13 +405,13 @@ static int jack_type_detect_change(struct work_struct *ignored)
 					count_pole = 0;
 					if(send_end_irq_token==1)
 					{
-						disable_irq(send_end->eint);
+						select_disable_irq();
 						send_end_irq_token=0;
 					}
 					current_jack_type_status = SEC_HEADSET_3_POLE_DEVICE;
 					if(!get_recording_status())
 					{
-						gpio_set_value(GPIO_MICBIAS_EN, 0);
+						gpio_set_value(gpio_ear_mic_bias_en, 0);
 					}
 					bQuit=true;
 				
@@ -311,7 +445,7 @@ static int jack_type_detect_change(struct work_struct *ignored)
 			current_jack_type_status = SEC_JACK_NO_DEVICE;
 			if(!get_recording_status())
 			{
-				gpio_set_value(GPIO_MICBIAS_EN, 0);
+				gpio_set_value(gpio_ear_mic_bias_en, 0);
     		}
 
 			SEC_JACKDEV_DBG("JACK dev detached  \n");			
@@ -343,12 +477,12 @@ static int jack_detect_change(struct work_struct *ignored)
 
 	
 	/* block send/end key event */
-	mod_timer(&send_end_key_event_timer,SEND_END_CHECK_TIME);
+	mod_timer(&send_end_key_event_timer,SEND_END_CHECK_TIME); // 2sec ->send_end_key_event_timer_handler-> sendend_timer_work_func
 
 
 	if(state)
 	{		
-		gpio_set_value(GPIO_MICBIAS_EN, 1);
+		gpio_set_value(gpio_ear_mic_bias_en, 1);
 		/* check pin state repeatedly */
 		while(count--)
 		{
@@ -362,7 +496,7 @@ static int jack_detect_change(struct work_struct *ignored)
 	
 		}
 
-		schedule_delayed_work(&detect_jack_type_work,50);
+		schedule_delayed_work(&detect_jack_type_work,50); //->jack_type_detect_change
 	}
 	else if(!state && current_jack_type_status != SEC_JACK_NO_DEVICE)
 	{
@@ -370,7 +504,7 @@ static int jack_detect_change(struct work_struct *ignored)
 
 		if(send_end_irq_token==1)
 		{
-			disable_irq(send_end->eint);
+			select_disable_irq();
 			send_end_irq_token=0;
 		}
 
@@ -383,7 +517,7 @@ static int jack_detect_change(struct work_struct *ignored)
 		current_jack_type_status = SEC_JACK_NO_DEVICE;
         if(!get_recording_status())
         {
-              gpio_set_value(GPIO_MICBIAS_EN, 0);
+              gpio_set_value(gpio_ear_mic_bias_en, 0);
         }
 		switch_set_state(&switch_jack_detection, current_jack_type_status);
 		SEC_JACKDEV_DBG("JACK dev detached  \n");			
@@ -401,15 +535,16 @@ static int sendend_switch_change(struct work_struct *ignored)
 	int count=6;
 	
 	headset_state = gpio_get_value(det_jack->gpio) ^ det_jack->low_active;
-	state = gpio_get_value(send_end->gpio) ^ send_end->low_active;
+	//state = gpio_get_value(send_end->gpio) ^ send_end->low_active;
+	state=get_gpio_send_end_state(); //hdlnc_ysyim_2010-05-11
 	
-
 	wake_lock_timeout(&jack_sendend_wake_lock,WAKELOCK_DET_TIMEOUT);
 		
 	/* check pin state repeatedly */
 	while(count-- && !send_end_pressed)
 	{
-		if(state != (gpio_get_value(send_end->gpio) ^ send_end->low_active) || !headset_state || current_jack_type_status == SEC_HEADSET_3_POLE_DEVICE)
+		//if(state != (gpio_get_value(send_end->gpio) ^ send_end->low_active) || !headset_state || current_jack_type_status == SEC_HEADSET_3_POLE_DEVICE)
+		if(state != get_gpio_send_end_state() || !headset_state || current_jack_type_status == SEC_HEADSET_3_POLE_DEVICE) ////hdlnc_ysyim_2010-05-11
 		{
 			printk(KERN_INFO "[ JACK_DRIVER] (%s,%d) ] SEND/END key is ignored. State is unstable.\n",__func__,__LINE__);
 			return -1;
@@ -417,6 +552,9 @@ static int sendend_switch_change(struct work_struct *ignored)
 
 		}
 		msleep(10);
+		
+		headset_state = gpio_get_value(det_jack->gpio) ^ det_jack->low_active;
+		//printk("jack %d\n",gpio_get_value(det_jack->gpio) ^ det_jack->low_active);
 
 	}
 
@@ -424,7 +562,8 @@ static int sendend_switch_change(struct work_struct *ignored)
 	input_sync(hi->input);
 	switch_set_state(&switch_sendend,state);
 	send_end_pressed = state;
-	printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] Button is %s.\n", __func__,__LINE__, state? "pressed" : "released");
+	//printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] Button is %s.\n", __func__,__LINE__, state? "pressed" : "released");
+	//printk( "Button is %s.\n",state? "pressed" : "released");
 
 	return 0;
 }
@@ -459,7 +598,7 @@ static irqreturn_t detect_irq_handler(int irq, void *dev_id)
 {
 	
 	send_end_enable = 0;
-	schedule_work(&jack_detect_work);
+	schedule_work(&jack_detect_work); //->jack_detect_change
 	return IRQ_HANDLED;
 }
  
@@ -473,13 +612,31 @@ static void send_end_key_event_timer_handler(unsigned long arg)
 static irqreturn_t send_end_irq_handler(int irq, void *dev_id)
 {
    struct sec_gpio_info   *det_jack = &hi->port.det_jack;
+   struct sec_gpio_info   *send_end = &hi->port.send_end;
+
    int headset_state;
+
+
+//	if(SendEnd_state==SENDENDOFF)
+//	{
+		if(irq ==send_end->eint)
+		{
+			SendEnd_state=SENDEND25;
+			//printk(KERN_INFO "XEINT_18\n");
+		}
+		else
+		{
+			SendEnd_state=SENDEND35;
+			//printk(KERN_INFO "XEINT_30\n");
+		}
+//	}
+		
 
 	headset_state = gpio_get_value(det_jack->gpio) ^ det_jack->low_active;
 
 	if (send_end_enable && headset_state)
 	{
-		schedule_work(&sendend_switch_work);		
+		schedule_work(&sendend_switch_work); //->sendend_switch_change		
 	}
 		  
 	return IRQ_HANDLED;
@@ -508,12 +665,12 @@ static ssize_t select_jack_store(struct device *dev, struct device_attribute *at
 		{
 			if(send_end_irq_token==1)
 			{
-				disable_irq(send_end->eint);
+				select_disable_irq();
 				send_end_irq_token=0;
 			}
 			if(!get_recording_status())
 			{
-				gpio_set_value(GPIO_MICBIAS_EN, 0);
+				gpio_set_value(gpio_ear_mic_bias_en, 0);
 			}
 			current_jack_type_status = SEC_HEADSET_3_POLE_DEVICE;			
 			printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] 3 pole headset or TV-out attatched : \n", __func__,__LINE__);
@@ -521,12 +678,12 @@ static ssize_t select_jack_store(struct device *dev, struct device_attribute *at
 		}
 		case SEC_HEADSET_4_POLE_DEVICE:
 		{
-			gpio_set_value(GPIO_MICBIAS_EN, 1);
+			gpio_set_value(gpio_ear_mic_bias_en, 1);
 			current_jack_type_status = SEC_HEADSET_4_POLE_DEVICE;
 			printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] 4 pole  headset attached : \n",__func__,__LINE__);
 			if(send_end_irq_token==0)
 			{
-				enable_irq(send_end->eint);
+				select_enable_irq();
 				send_end_irq_token=1;
 			}
 			break;
@@ -535,14 +692,14 @@ static ssize_t select_jack_store(struct device *dev, struct device_attribute *at
 		{
 			if(send_end_irq_token==1)
 			{
-				disable_irq(send_end->eint);
+				select_disable_irq();
 				send_end_irq_token=0;
 			}
 			current_jack_type_status = SEC_JACK_NO_DEVICE;
 
 			if(!get_recording_status())
 			{
-				gpio_set_value(GPIO_MICBIAS_EN,0);
+				gpio_set_value(gpio_ear_mic_bias_en,0);
 			}
 			printk(KERN_INFO "[ JACK_DRIVER (%s,%d) ] JACK dev detached  \n",__func__,__LINE__);			
 			break;
@@ -557,16 +714,20 @@ static ssize_t select_jack_store(struct device *dev, struct device_attribute *at
 
 	return size;
 }
+
 static DEVICE_ATTR(select_jack, S_IRUGO | S_IWUSR | S_IWOTH | S_IXOTH, select_jack_show, select_jack_store);
-extern unsigned int HWREV;
+
 static int sec_jack_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct sec_jack_platform_data *pdata = pdev->dev.platform_data;
 	struct sec_gpio_info   *det_jack;
 	struct sec_gpio_info   *send_end;
+	struct sec_gpio_info   *send_end35;
 	struct input_dev	   *input;
 	current_jack_type_status = SEC_JACK_NO_DEVICE;
+
+	select_gpio_earmic_bias(); //hdlnc_ysyim_2010-05-04
 	
 	printk(KERN_INFO "SEC JACK: Registering jack driver\n");
 	
@@ -628,33 +789,120 @@ static int sec_jack_probe(struct platform_device *pdev)
 	if (device_create_file(jack_selector_fs, &dev_attr_select_jack) < 0)
 		printk(KERN_ERR "Failed to create device file(%s)!\n", dev_attr_select_jack.attr.name);	
 
-	//GPIO configuration
-	send_end = &hi->port.send_end;
-	s3c_gpio_cfgpin(send_end->gpio, S3C_GPIO_SFN(send_end->gpio_af));
-	s3c_gpio_setpull(send_end->gpio, S3C_GPIO_PULL_NONE);
-	set_irq_type(send_end->eint, IRQ_TYPE_EDGE_BOTH);
-       
-	ret = request_irq(send_end->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
+	SendEnd_state=SENDENDOFF;//hdlnc_ysyim_2010-05-11
 
 
-	SEC_JACKDEV_DBG("sended isr send=0X%x, ret =%d", send_end->eint, ret);
-	if (ret < 0)
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) //Kepler
+	if(HWREV!=0x08)
 	{
-		printk(KERN_ERR "SEC HEADSET: Failed to register send/end interrupt.\n");
-		goto err_request_send_end_irq;
+		//GPIO configuration
+		send_end = &hi->port.send_end;
+		s3c_gpio_cfgpin(send_end->gpio, S3C_GPIO_SFN(send_end->gpio_af));
+		s3c_gpio_setpull(send_end->gpio, S3C_GPIO_PULL_NONE);
+		set_irq_type(send_end->eint, IRQ_TYPE_EDGE_BOTH);
+
+		ret = request_irq(send_end->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
+
+		SEC_JACKDEV_DBG("sended isr send=0X%x, ret =%d", send_end->eint, ret);
+		if (ret < 0)
+		{
+			printk(KERN_ERR "SEC HEADSET: Failed to register send/end interrupt.\n");
+			goto err_request_send_end_irq;
+		}
+
+		disable_irq(send_end->eint);
+
+
+		send_end35 = &hi->port.send_end35;
+		s3c_gpio_cfgpin(send_end35->gpio, S3C_GPIO_SFN(send_end35->gpio_af));
+		s3c_gpio_setpull(send_end35->gpio, S3C_GPIO_PULL_NONE);
+		set_irq_type(send_end35->eint, IRQ_TYPE_EDGE_BOTH);
+
+		ret = request_irq(send_end35->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
+
+		SEC_JACKDEV_DBG("sended35 isr send=0X%x, ret =%d", send_end35->eint, ret);
+		if (ret < 0)
+		{
+			printk(KERN_ERR "SEC HEADSET35 : Failed to register send/end interrupt.\n");
+			goto err_request_send_end_irq;
+		}
+
+		disable_irq(send_end35->eint);
+		
+		send_end_irq_token=0;
 	}
+#elif (defined CONFIG_S5PC110_T959_BOARD) //T959
+	if(HWREV==0x0a ||HWREV==0x0c)
+	{
+		//GPIO configuration
+		send_end = &hi->port.send_end;
+		s3c_gpio_cfgpin(send_end->gpio, S3C_GPIO_SFN(send_end->gpio_af));
+		s3c_gpio_setpull(send_end->gpio, S3C_GPIO_PULL_NONE);
+		set_irq_type(send_end->eint, IRQ_TYPE_EDGE_BOTH);
 
-	disable_irq(send_end->eint);
-	send_end_irq_token=0;
+		ret = request_irq(send_end->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
 
+		SEC_JACKDEV_DBG("sended isr send=0X%x, ret =%d", send_end->eint, ret);
+		if (ret < 0)
+		{
+			printk(KERN_ERR "SEC HEADSET: Failed to register send/end interrupt.\n");
+			goto err_request_send_end_irq;
+		}
+
+		disable_irq(send_end->eint);
+		send_end_irq_token=0;
+	}
+	else
+	{
+		//GPIO configuration
+		send_end = &hi->port.send_end;
+		s3c_gpio_cfgpin(send_end->gpio, S3C_GPIO_SFN(send_end->gpio_af));
+		s3c_gpio_setpull(send_end->gpio, S3C_GPIO_PULL_NONE);
+		set_irq_type(send_end->eint, IRQ_TYPE_EDGE_BOTH);
+
+		ret = request_irq(send_end->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
+
+		SEC_JACKDEV_DBG("sended isr send=0X%x, ret =%d", send_end->eint, ret);
+		if (ret < 0)
+		{
+			printk(KERN_ERR "SEC HEADSET: Failed to register send/end interrupt.\n");
+			goto err_request_send_end_irq;
+		}
+
+		disable_irq(send_end->eint);
+
+
+		send_end35 = &hi->port.send_end35;
+		s3c_gpio_cfgpin(send_end35->gpio, S3C_GPIO_SFN(send_end35->gpio_af));
+		s3c_gpio_setpull(send_end35->gpio, S3C_GPIO_PULL_NONE);
+		set_irq_type(send_end35->eint, IRQ_TYPE_EDGE_BOTH);
+
+		ret = request_irq(send_end35->eint, send_end_irq_handler, IRQF_DISABLED, "sec_headset_send_end", NULL);
+
+		SEC_JACKDEV_DBG("sended35 isr send=0X%x, ret =%d", send_end35->eint, ret);
+		if (ret < 0)
+		{
+			printk(KERN_ERR "SEC HEADSET35 : Failed to register send/end interrupt.\n");
+			goto err_request_send_end_irq;
+		}
+
+		disable_irq(send_end35->eint);
+		
+		send_end_irq_token=0;
+	}
+#endif
+	
 	det_jack = &hi->port.det_jack;
 	s3c_gpio_cfgpin(det_jack->gpio, S3C_GPIO_SFN(det_jack->gpio_af));
 	s3c_gpio_setpull(det_jack->gpio, S3C_GPIO_PULL_NONE);
 	set_irq_type(det_jack->eint, IRQ_TYPE_EDGE_BOTH);
+	
+#if 0
 	if(HWREV >= 0xa)
 	{
 		det_jack->low_active = 1; 
 	}
+#endif
 
 	ret = request_irq(det_jack->eint, detect_irq_handler, IRQF_DISABLED, "sec_headset_detect", NULL);
 
@@ -691,8 +939,8 @@ static int sec_jack_probe(struct platform_device *pdev)
 		gpio_direction_output(GPIO_EARPATH_SEL,1);
 	}
 	s3c_gpio_slp_cfgpin(GPIO_EARPATH_SEL, S3C_GPIO_SLP_PREV);
-       gpio_direction_output(GPIO_MICBIAS_EN,0);
-	s3c_gpio_slp_cfgpin(GPIO_MICBIAS_EN, S3C_GPIO_SLP_PREV);
+       gpio_direction_output(gpio_ear_mic_bias_en,0);
+	s3c_gpio_slp_cfgpin(gpio_ear_mic_bias_en, S3C_GPIO_SLP_PREV);
 #endif
 
 	wake_lock_init(&jack_sendend_wake_lock, WAKE_LOCK_SUSPEND, "sec_jack");
@@ -721,7 +969,23 @@ static int sec_jack_remove(struct platform_device *pdev)
 	SEC_JACKDEV_DBG("");
 	input_unregister_device(hi->input);
 	free_irq(hi->port.det_jack.eint, 0);
-	free_irq(hi->port.send_end.eint, 0);
+	#if defined(CONFIG_S5PC110_KEPLER_BOARD) //Kepler
+	if(HWREV!=0x08)
+	{
+		free_irq(hi->port.send_end.eint, 0);  // hdlnc_bp_kwon : 20100301
+		free_irq(hi->port.send_end35.eint, 0);
+	}
+	#elif (defined CONFIG_S5PC110_T959_BOARD) //T959
+	if(HWREV==0x0a ||HWREV==0x0c)
+	{
+		free_irq(hi->port.send_end.eint, 0);
+	}
+	else
+	{
+		free_irq(hi->port.send_end.eint, 0);
+		free_irq(hi->port.send_end35.eint, 0);
+	}
+	#endif
 	switch_dev_unregister(&switch_jack_detection);
 	switch_dev_unregister(&switch_sendend);
 	return 0;
@@ -730,16 +994,21 @@ static int sec_jack_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int sec_jack_suspend(struct platform_device *pdev, pm_message_t state)
 {
+	//printk("HWREV:0x%x, gpio_ear_mic:%d\n",HWREV,gpio_ear_mic_bias_en);
+	
 	if(current_jack_type_status == SEC_JACK_NO_DEVICE || current_jack_type_status == SEC_HEADSET_3_POLE_DEVICE)
 	{
         if(!get_recording_status())
         {
 			
-			gpio_set_value(GPIO_MICBIAS_EN, 0);
+			gpio_set_value(gpio_ear_mic_bias_en, 0);
 			
         }
 
 	}
+
+	printk("EAR_MIC:0x%x,MAIN_MIC:0x%x\n", gpio_get_value(gpio_ear_mic_bias_en),gpio_get_value(GPIO_MICBIAS_EN));
+
 	return 0;
 }
 static int sec_jack_resume(struct platform_device *pdev)

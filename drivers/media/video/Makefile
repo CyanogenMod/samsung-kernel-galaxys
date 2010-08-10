@@ -76,6 +76,7 @@ obj-$(CONFIG_VIDEO_S5K4EA)	+= s5k4ea.o
 obj-$(CONFIG_VIDEO_S5K6AA)	+= s5k6aa.o
 obj-$(CONFIG_VIDEO_CE147)	+= ce147.o
 obj-$(CONFIG_VIDEO_S5KA3DFX)	+= s5ka3dfx.o
+obj-$(CONFIG_VIDEO_ISX005)	+= isx005.o
 obj-$(CONFIG_VIDEO_TVEEPROM) += tveeprom.o
 obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
 obj-$(CONFIG_SOC_CAMERA_MT9M111)	+= mt9m111.o

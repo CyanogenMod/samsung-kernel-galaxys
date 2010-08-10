@@ -34,24 +34,50 @@
 #include <plat/regs-clock.h>
 #include <plat/regs-power.h>
 #include <mach/map.h>
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#include <plat/s5pc110.h>
+#include <plat/regs-gpio.h>
 
 #include "s5pc110_battery.h"
 
+#include <mach/max8998_function.h>
 static struct wake_lock vbus_wake_lock;
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+static struct wake_lock low_battery_wake_lock;
 
 #include <linux/i2c.h>
 #include "fuel_gauge.c"
+
+//NAGSM_Android_SEL_Kernel_Aakash_20100312
+struct class *battery_class;
+struct device *s5pc110bat_dev;
+//NAGSM_Android_SEL_Kernel_Aakash_20100312
 
 /* Prototypes */
 extern int s3c_adc_get_adc_data(int channel);
 extern void MAX8998_IRQ_init(void);
 extern void maxim_charging_control(unsigned int dev_type  , unsigned int cmd, int uicharging);
+
+// [[ junghyunseok edit for stepcharging 20100506
+extern void stepcharging_Timer_setup();
+
 extern void maxim_topoff_change(void);
 extern unsigned char maxim_chg_status(void);
 extern unsigned char maxim_charging_enable_status(void);
+#ifdef defined(__PMIC_V_F__)
 extern unsigned char maxim_vf_status(void);
+#endif
 extern u8 FSA9480_Get_JIG_Status(void);
 extern void set_low_bat_interrupt(int on);
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+irqreturn_t low_battery_isr(int irq, void *dev_id);
+
+//#define BATTERY_DEBUG
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+#ifdef BATTERY_DEBUG
+void PMIC_dump(void);
+#endif
+#endif
 
 #ifdef __TEST_DEVICE_DRIVER__
 extern int amp_enable(int);
@@ -64,7 +90,7 @@ static struct wake_lock wake_lock_for_dev;
 #endif /* __TEST_DEVICE_DRIVER__ */
 
 
-#define LPM_MODE
+//#define LPM_MODE
 
 #define TRUE		1
 #define FALSE	0
@@ -87,9 +113,15 @@ static struct wake_lock wake_lock_for_dev;
 #define OFFSET_TA_ATTACHED		(0x1 << 8)
 #define OFFSET_CAM_FLASH		(0x1 << 9)
 #define OFFSET_BOOTING			(0x1 << 10)
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+#define OFFSET_WIFI				(0x1 << 11)
+#define OFFSET_GPS				(0x1 << 12)
+#endif
 
 #define INVALID_VOL_ADC		160
 
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+static struct work_struct low_bat_work;
 
 typedef enum {
 	CHARGER_BATTERY = 0,
@@ -221,6 +253,10 @@ static struct device_attribute s3c_battery_attrs[] = {
 	SEC_BATTERY_ATTR(talk_gsm),
 	SEC_BATTERY_ATTR(talk_wcdma),
 	SEC_BATTERY_ATTR(data_call),
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+	SEC_BATTERY_ATTR(wifi),
+	SEC_BATTERY_ATTR(gps),	
+#endif	
 	SEC_BATTERY_ATTR(device_state),
 	SEC_BATTERY_ATTR(batt_compensation),
 	SEC_BATTERY_ATTR(is_booting),
@@ -257,6 +293,10 @@ enum {
 	BATT_VOICE_CALL_2G,
 	BATT_VOICE_CALL_3G,
 	BATT_DATA_CALL,
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+	BATT_WIFI,
+	BATT_GPS,		
+#endif	
 	BATT_DEV_STATE,
 	BATT_COMPENSATION,
 	BATT_BOOTING,
@@ -312,16 +352,28 @@ static int batt_min;
 static int batt_off;
 static int batt_compensation;
 
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+static int count_check_chg_current;
+static int count_check_recharging_bat;
+#endif
+
 static unsigned int start_time_msec;
 static unsigned int total_time_msec;
 static unsigned int end_time_msec;
-
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)  || (defined CONFIG_S5PC110_FLEMING_BOARD)
+// [junghyunseok edit for CTIA of behold3 20100413
+static int event_occur = 0;	
+static unsigned int event_start_time_msec;
+static unsigned int event_total_time_msec;
+#endif
 
 static struct s3c_battery_info s3c_bat_info;
 
 extern charging_device_type curent_device_type;
 
 static int full_charge_flag;
+
+unsigned int is_calling_or_playing = 0;
 
 #ifdef __TEST_DEVICE_DRIVER__
 #define SEC_TEST_ATTR(_name)								\
@@ -537,6 +589,49 @@ unsigned int charging_mode_get(void)
 #endif
 
 
+//NAGSM_Android_SEL_Kernel_Aakash_20100503
+static int charging_connect;
+static int charging_control_overide = 1;
+int is_under_at_sleep_cmd = 0;
+
+int get_wakelock_for_AT_SLEEP(void)
+{
+	wake_lock(&vbus_wake_lock);
+}
+
+int release_wakelock_for_AT_SLEEP(void)
+{
+	wake_lock_timeout(&vbus_wake_lock,HZ * 5);
+}
+
+static ssize_t charging_status_show(struct device *dev, struct device_attribute *attr, char *sysfsbuf)
+{	
+	charging_connect = s3c_bat_info.bat_info.charging_enabled;
+	return sprintf(sysfsbuf, "%d\n", charging_connect);
+}
+
+static ssize_t charging_con_store(struct device *dev, struct device_attribute *attr,const char *sysfsbuf, size_t size)
+{
+	sscanf(sysfsbuf, "%d", &charging_connect);
+
+	mutex_lock(&work_lock);		
+
+	printk("+++++ charging_connect = %d +++++\n", charging_connect);
+	
+	charging_control_overide = charging_connect;
+	s3c_set_chg_en(charging_connect);
+
+	release_wakelock_for_AT_SLEEP();	
+	is_under_at_sleep_cmd = !charging_control_overide;
+	
+	mutex_unlock(&work_lock);	
+
+	return size;
+}
+
+static DEVICE_ATTR(usbchargingcon, S_IRUGO | S_IWUSR, charging_status_show, charging_con_store);
+//NAGSM_Android_SEL_Kernel_Aakash_20100503
+
 static int s3c_bat_get_property(struct power_supply *bat_ps, 
 		enum power_supply_property psp,
 		union power_supply_propval *val)
@@ -672,7 +767,11 @@ static ssize_t s3c_bat_show_property(struct device *dev, struct device_attribute
 			break;
 #endif /* __BATTERY_COMPENSATION__ */
 		case BATT_FG_SOC:
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",  s3c_bat_info.bat_info.level);	
+#else				
 			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",  fg_read_soc());
+#endif			
 			break;
 #ifdef LPM_MODE
 		case CHARGING_MODE_BOOTING:
@@ -715,6 +814,8 @@ static void s3c_bat_set_compesation(int mode, int offset, int compensate_value)
 			batt_compensation -= compensate_value;
 		}
 	}
+
+	is_calling_or_playing = s3c_bat_info.device_state;
 	//pr_info("[BAT]:%s: device_state=0x%x, compensation=%d\n", __func__, s3c_bat_info.device_state, batt_compensation);
 	
 }
@@ -733,7 +834,7 @@ static void s3c_bat_set_vol_cal(int batt_cal)
 
 	if (batt_cal >= max_cal)
 	{
-		//dev_err(dev, "%s: invalid battery_cal(%d)\n", __func__, batt_cal);
+		dev_err(dev, "%s: invalid battery_cal(%d)\n", __func__, batt_cal);
 		return;
 	}
 
@@ -898,6 +999,24 @@ static ssize_t s3c_bat_store(struct device *dev, struct device_attribute *attr, 
 			}
 			//pr_info("[BAT]:%s: data call = %d\n", __func__, x);
 			break;
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)		
+		case BATT_WIFI:
+			if (sscanf(buf, "%d\n", &x) == 1)
+			{
+				s3c_bat_set_compesation(x, OFFSET_WIFI, COMPENSATE_WIFI);
+				ret = count;
+			}
+			//pr_info("[BAT]:%s: wifi = %d\n", __func__, x);
+			break;
+		case BATT_GPS:
+			if (sscanf(buf, "%d\n", &x) == 1)
+			{
+				s3c_bat_set_compesation(x, OFFSET_GPS, COMPENSATE_GPS);
+				ret = count;
+			}
+			//pr_info("[BAT]:%s: gps = %d\n", __func__, x);
+			break;						
+#endif			
 #ifdef COMPENSATE_BOOTING
 		case BATT_BOOTING:
 			if (sscanf(buf, "%d\n", &x) == 1)
@@ -1038,7 +1157,7 @@ static unsigned long calculate_average_adc(adc_channel_type channel, int adc)
 	total_adc = adc_sample[channel].total_adc;
 
 	if (adc < 0 || adc == 0) {
-		//dev_err(dev, "%s: invalid adc : %d\n", __func__, adc);
+		dev_err(dev, "%s: invalid adc : %d\n", __func__, adc);
 		adc = adc_sample[channel].average_adc;
 	}
 
@@ -1113,7 +1232,7 @@ static int is_over_abs_time(void)
 
 	if (total_time_msec > total_time && start_time_msec)
 	{
-		//pr_info("[BAT]:%s:abs time is over.:start_time=%u, total_time_msec=%u\n", __func__, start_time_msec, total_time_msec);
+		pr_info("[BAT]:%s:abs time is over.:start_time=%u, total_time_msec=%u\n", __func__, start_time_msec, total_time_msec);
 		return 1;
 	}	
 	else
@@ -1122,36 +1241,116 @@ static int is_over_abs_time(void)
 	}
 }
 
-
-
-#ifdef __CHECK_CHG_CURRENT__
-static void check_chg_current(struct power_supply *bat_ps)
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+static int is_over_event_time(void)
 {
-	static int cnt = 0;
-	unsigned long chg_current = 0; 
+	unsigned int total_time=0;
 
-	chg_current = s3c_bat_get_adc_data(S3C_ADC_CHG_CURRENT);
-	s3c_bat_info.bat_info.batt_current = chg_current;
-	if (chg_current <= CURRENT_OF_FULL_CHG)
+	//pr_info("[BAT]:%s\n", __func__);
+
+	if(!event_start_time_msec)
 	{
-		cnt++;
-		if (cnt >= 10)
-		{
-			//pr_info("[BAT]:%s: battery full\n", __func__);
-			s3c_set_chg_en(0);
-			s3c_bat_info.bat_info.batt_is_full = 1;
-			force_update = 1;
-			cnt = 0;
-		}
+// [junghyunseok edit for CTIA of behold3 20100413	
+		return 1;
+	}
+		
+		total_time = TOTAL_EVENT_TIME;
+
+	if(jiffies_to_msecs(jiffies) >= event_start_time_msec)
+	{
+		event_total_time_msec = jiffies_to_msecs(jiffies) - event_start_time_msec;
 	}
 	else
 	{
-		cnt = 0;
+		event_total_time_msec = 0xFFFFFFFF - event_start_time_msec + jiffies_to_msecs(jiffies);
+	}
+
+	if (event_total_time_msec > total_time && event_start_time_msec)
+	{
+		pr_info("[BAT]:%s:abs time is over.:event_start_time_msec=%u, event_total_time_msec=%u\n", __func__, event_start_time_msec, event_total_time_msec);
+		return 1;
+	}	
+	else
+	{
+		return 0;
+	}
+}
+#endif
+
+#ifdef __CHECK_CHG_CURRENT__
+
+static void check_chg_current(void)
+{
+	unsigned long chg_current = 0; 
+
+	chg_current = s3c_bat_get_adc_data(S3C_ADC_CHG_CURRENT);
+#ifdef BATTERY_DEBUG
+	printk("[chg_current] %s:  chg_current = %d , count_check_chg_current = %d\n", __func__, chg_current, count_check_chg_current);
+#endif	
+	s3c_bat_info.bat_info.batt_current = chg_current;
+
+	if ((!s3c_bat_info.bat_info.batt_is_full)  && (CURRENT_OF_TOPOFF_CHG < chg_current) &&  (chg_current<= CURRENT_OF_FULL_CHG)) 
+	{
+		count_check_chg_current++;
+		if (count_check_chg_current >= 10) {
+			dev_info(dev, "%s: battery full\n", __func__);
+#ifdef BATTERY_DEBUG
+			printk("[FULL Display] %s: battery full, count_check_chg_current = %d\n", __func__, count_check_chg_current);
+       		PMIC_dump();
+#endif			
+			s3c_bat_info.bat_info.batt_is_full = 1;
+			force_update = 1;
+// [junghyunseok edit to prevent wrong charging disable 20100414
+//			full_charge_flag = 1;
+			count_check_chg_current = 0;
+		}
+	}  
+// [[junghyunseok edit to remove topoff 20100510
+       else if( s3c_bat_info.bat_info.batt_is_full  && (chg_current < CURRENT_OF_TOPOFF_CHG) && (chg_current != 0) )
+       {
+              count_check_chg_current++;
+       	if (count_check_chg_current >= 10) 
+			{
+#ifdef BATTERY_DEBUG			
+				printk("[FULL : CHG CUT OFF] %s: battery full\n", __func__);     
+	       		PMIC_dump();
+#endif		
+// [junghyunseok edit to prevent wrong charging disable 20100414		
+				force_update = 1;
+				full_charge_flag = 1;
+				count_check_chg_current = 0;				
+       		}	
+       }
+	else {
+		count_check_chg_current = 0;
 	}
 }
 #endif /* __CHECK_CHG_CURRENT__ */
 
-
+#ifdef __ADJUST_RECHARGE_ADC__
+static void check_recharging_bat(int bat_vol)
+{
+// [junghyunseok edit to remove too many log 20100414
+	//printk("[ %s]   count_check_chg_current = %d\n", __func__,  count_check_recharging_bat);
+// [[junghyunseok edit to remove topoff 20100510
+	if ( bat_vol < RECHARGE_COND_VOLTAGE) 
+	{
+// ]]junghyunseok edit to remove topoff 20100510
+		if (++count_check_recharging_bat >= 10) {
+			dev_info(dev, "%s: recharging\n", __func__);
+#ifdef BATTERY_DEBUG			
+			printk( "%s: recharging , count_check_recharging_bat = %d\n", __func__, count_check_recharging_bat);
+#endif			
+			s3c_set_chg_en(1);	
+			s3c_bat_info.bat_info.batt_is_recharging = 1;
+			full_charge_flag = 0;					
+			count_check_recharging_bat = 0;
+		}
+	} else {
+		count_check_recharging_bat = 0;
+	}
+}
+#endif /* __ADJUST_RECHARGE_ADC__ */
 
 
 static u32 s3c_get_bat_health(void)
@@ -1190,9 +1389,32 @@ static void s3c_set_time_for_charging(int mode)
 	}
 }
 
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+static void s3c_set_time_for_event(int mode)
+{
+
+	//pr_info("[BAT]:%s\n", __func__);
+
+	if (mode)
+	{
+		/* record start time for abs timer */
+		event_start_time_msec = jiffies_to_msecs(jiffies);
+		//pr_info("[BAT]:%s: start_time(%u)\n", __func__, event_start_time_msec);
+	}
+	else
+	{
+		/* initialize start time for abs timer */
+		event_start_time_msec = 0;
+		event_total_time_msec = 0;
+		//pr_info("[BAT]:%s: start_time_msec(%u)\n", __func__, event_start_time_msec);
+	}
+}
+#endif
+
+static int charging_state;
 static void s3c_set_chg_en(int enable)
 {
-	static int charging_state=-1;
+
 	int chg_en_val;
 
 	//pr_info("[BAT]:%s\n", __func__);
@@ -1233,6 +1455,7 @@ static void s3c_set_chg_en(int enable)
 			charging_state = 0;
 		}
 		s3c_bat_info.bat_info.charging_enabled = charging_state;
+		ce_for_fuelgauge = charging_state;
 		
 		//pr_info("[BAT]:%s: charging_state = %d\n", __func__, charging_state);
 
@@ -1248,15 +1471,15 @@ static void s3c_temp_control(int mode)
 	switch (mode)
 	{
 		case POWER_SUPPLY_HEALTH_GOOD:
-			//pr_info("[BAT]:%s: GOOD\n", __func__);
+			pr_info("[BAT]:%s: GOOD\n", __func__);
 			s3c_set_bat_health(mode);
 			break;
 		case POWER_SUPPLY_HEALTH_OVERHEAT:
-			//pr_info("[BAT]:%s: OVERHEAT\n", __func__);
+			pr_info("[BAT]:%s: OVERHEAT\n", __func__);
 			s3c_set_bat_health(mode);
 			break;
 		case POWER_SUPPLY_HEALTH_FREEZE:
-			//pr_info("[BAT]:%s: FREEZE\n", __func__);
+			pr_info("[BAT]:%s: FREEZE\n", __func__);
 			s3c_set_bat_health(mode);
 			break;
 		default:
@@ -1279,7 +1502,7 @@ static void s3c_cable_check_status(void)
 	{
 		if (s3c_get_bat_health() != POWER_SUPPLY_HEALTH_GOOD)
 		{
-			//pr_info("[BAT]:%s:Unhealth battery state!\n", __func__);
+			pr_info("[BAT]:%s:Unhealth battery state!\n", __func__);
 			cable_status = CHARGER_DISCHARGE;
 		}
 		else if (get_usb_power_state())
@@ -1302,22 +1525,6 @@ static void s3c_cable_check_status(void)
 
 }
 
-static unsigned int s3c_bat_check_v_f(void)
-{
-	unsigned int ret = 0;
-	
-	if( maxim_vf_status() || FSA9480_Get_JIG_Status() )	// bat detected
-	{
-		ret = 1;
-	}
-	else
-	{
-		//dev_err(dev, "%s: VF error!\n", __func__);
-		s3c_set_bat_health(POWER_SUPPLY_HEALTH_UNSPEC_FAILURE);
-		ret = 0;
-	}
-	return ret;
-}
 
 void s3c_cable_changed(void)
 {
@@ -1328,15 +1535,13 @@ void s3c_cable_changed(void)
 		return;
 	}
 
-	if (s3c_bat_check_v_f() == 0)
-	{
-		if (pm_power_off)
-			pm_power_off();
-	}
-
 	s3c_bat_info.bat_info.batt_is_full = 0;
 	batt_chg_full_1st=0;
 	force_log=1;
+// [junghyunseok edit for CTIA of behold3 20100413	
+	if(s3c_bat_info.bat_info.batt_health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)
+	s3c_set_bat_health(POWER_SUPPLY_HEALTH_GOOD);	
+
 	s3c_cable_check_status();
 
 	schedule_work(&bat_work);
@@ -1364,13 +1569,13 @@ void s3c_cable_charging(void)
 	{
 		if(batt_chg_full_1st == 1)
 		{
-			//pr_info("[BAT]:%s:2nd fully charged interrupt.\n",__func__);
+			pr_info("[BAT]:%s:2nd fully charged interrupt.\n",__func__);
 			full_charge_flag = 1;			
 			force_update = 1;
 		}
 		else
 		{
-			//pr_info("[BAT]:%s:1st fully charged interrupt.\n",__func__);
+			pr_info("[BAT]:%s:1st fully charged interrupt.\n",__func__);
 			s3c_bat_info.bat_info.batt_is_full = 1;
 			batt_chg_full_1st=1;
 			force_update = 1;
@@ -1386,10 +1591,9 @@ void s3c_cable_charging(void)
 	mod_timer(&polling_timer, jiffies + msecs_to_jiffies(s3c_bat_info.polling_interval));
 }
 
-
+static charger_type_t old_cable_status;
 static int s3c_cable_status_update(void)
 {
-	static charger_type_t old_cable_status = CHARGER_BATTERY;
 
 	//pr_info("[BAT]:%s\n", __func__);
 
@@ -1433,6 +1637,33 @@ static int s3c_cable_status_update(void)
 	
 }
 
+// [[ junghyunseok edit for recharging and full charging 20100414
+#ifdef BATTERY_DEBUG
+void PMIC_dump(void)
+{
+    int count,kcount;
+    unsigned char reg_buff[0x40]; 	 
+
+	
+    for(count = 0; count<0x40 ; count++)
+    	{
+            reg_buff[count] = 0;
+	     pmic_read(0xCC, count, &reg_buff[count], (byte)1);
+    	}
+
+     printk(" PMIC dump =========================== \n ");
+
+    for(kcount = 0; kcount < 8 ; kcount++)
+    	{
+    	     for(count = 0;count < 8 ; count++)
+	     printk(" Reg [%x] = %x ", count+(8*kcount), reg_buff[count+(8*kcount)]);
+	     printk("  \n ");
+			 
+    	}
+}
+#endif
+// ]] junghyunseok edit for recharging and full charging 20100414
+
 static int s3c_get_bat_temp(void)
 {
 	int temp = 0;
@@ -1464,23 +1695,50 @@ static int s3c_get_bat_temp(void)
 #endif /* __TEST_DEVICE_DRIVER__ */
 
 	s3c_bat_info.bat_info.batt_temp_adc_aver=temp_adc_aver;
-
-	ex_case = OFFSET_MP3_PLAY | OFFSET_VOICE_CALL_2G | OFFSET_VOICE_CALL_3G	| OFFSET_DATA_CALL | OFFSET_VIDEO_PLAY;
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD) || (defined CONFIG_S5PC110_FLEMING_BOARD)
+	ex_case = OFFSET_MP3_PLAY | OFFSET_VOICE_CALL_2G | OFFSET_VOICE_CALL_3G | OFFSET_DATA_CALL | OFFSET_VIDEO_PLAY |
+                       OFFSET_CAMERA_ON | OFFSET_WIFI | OFFSET_GPS;
+  	if (s3c_bat_info.device_state & ex_case) {
+  	  if (temp_adc_aver <= EVENT_TEMP_HIGH_BLOCK) {
+  	 	 	if (health != POWER_SUPPLY_HEALTH_OVERHEAT &&
+				health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)
+  			s3c_temp_control(POWER_SUPPLY_HEALTH_OVERHEAT);
+	  } else if (temp_adc_aver >= EVENT_TEMP_HIGH_RECOVER) {
+  			if (health == POWER_SUPPLY_HEALTH_OVERHEAT &&
+  				health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)
+  			s3c_temp_control(POWER_SUPPLY_HEALTH_GOOD);  	
+  	  }
+	  if(event_occur == 0){	
+	    event_occur = 1;
+	  }    
+		goto __map_temperature__;
+	}
+       if(event_occur == 1){
+	      s3c_set_time_for_event(1);
+	      event_occur = 0;
+	}
+#else					   
+	ex_case = OFFSET_MP3_PLAY | OFFSET_VOICE_CALL_2G | OFFSET_VOICE_CALL_3G	| OFFSET_DATA_CALL | OFFSET_VIDEO_PLAY;	
 	if (s3c_bat_info.device_state & ex_case)
 	{
 		if (health == POWER_SUPPLY_HEALTH_OVERHEAT || health == POWER_SUPPLY_HEALTH_FREEZE)
 		{
 			s3c_temp_control(POWER_SUPPLY_HEALTH_GOOD);
-			//pr_info("[BAT]:%s : temp exception case. : device_state=%d \n", __func__, s3c_bat_info.device_state);
+			pr_info("[BAT]:%s : temp exception case. : device_state=%d \n", __func__, s3c_bat_info.device_state);
 		}
 		goto __map_temperature__;
 	}
-
+#endif
 	if (temp_adc_aver <= TEMP_HIGH_BLOCK)
 	{
-		if (health != POWER_SUPPLY_HEALTH_OVERHEAT && health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+		if (health != POWER_SUPPLY_HEALTH_OVERHEAT && health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE && is_over_event_time())
+#else		
+		if (health != POWER_SUPPLY_HEALTH_OVERHEAT && health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE)		
+#endif		
 		{
 			s3c_temp_control(POWER_SUPPLY_HEALTH_OVERHEAT);
+			s3c_set_time_for_event(0);			
 		}
 	}
 	else if (temp_adc_aver >= TEMP_HIGH_RECOVER && temp_adc_aver <= TEMP_LOW_RECOVER)
@@ -1539,7 +1797,7 @@ static int s3c_get_bat_vol(void)
 
 	if ((fg_vcell = fg_read_vcell()) < 0)
 	{
-		//dev_err(dev, "%s: Can't read vcell!!!\n", __func__);
+		dev_err(dev, "%s: Can't read vcell!!!\n", __func__);
 		fg_vcell = s3c_bat_info.bat_info.batt_vol;
 	}
 	else
@@ -1561,9 +1819,16 @@ static int s3c_get_bat_level(void)
 
 	if ((fg_soc = fg_read_soc()) < 0)
 	{
-		//dev_err(dev, "%s: Can't read soc!!!\n", __func__);
+		dev_err(dev, "%s: Can't read soc!!!\n", __func__);
 		fg_soc = s3c_bat_info.bat_info.level;
 	}
+
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+	if (low_battery_flag && (fg_soc <= 1))
+		fg_soc = 0;  
+	else
+		low_battery_flag = 0;
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 
 	new_temp_level=fg_soc;
 	
@@ -1628,19 +1893,22 @@ static int s3c_bat_is_full_charged(void)
 static void s3c_bat_charging_control(void)
 {
 	//pr_info("[BAT]:%s\n", __func__);
+	
 
 	if(cable_status==CHARGER_BATTERY || cable_status==CHARGER_DISCHARGE)
 	{
 		s3c_set_chg_en(0);
-		//pr_info("[BAT]:%s:no charging.\n", __func__);
+//		pr_info("[BAT]:%s:no charging.\n", __func__);
 	}
+#ifndef __ADJUST_RECHARGE_ADC__	
 	else if(s3c_bat_need_recharging())
 	{
-		//pr_info("[BAT]:%s:need recharging.\n", __func__);
+		pr_info("[BAT]:%s:need recharging.\n", __func__);
 		s3c_set_chg_en(1);
 		s3c_bat_info.bat_info.batt_is_recharging = 1;
 		full_charge_flag = 0;
 	}
+#endif	
 	else if(s3c_bat_is_full_charged())
 	{
 		s3c_set_chg_en(0);
@@ -1676,6 +1944,22 @@ static void s3c_bat_status_update(void)
 		s3c_bat_info.bat_info.level=new_temp_level;		
 	}
 
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100506
+#if defined(CONFIG_KEPLER_VER_B2)
+		if((s3c_bat_info.bat_info.level>=6) && (rcomp_status!=1))
+			fuel_gauge_rcomp(FUEL_INT_2ND);
+		else if((s3c_bat_info.bat_info.level<5) && (rcomp_status!=2))
+			fuel_gauge_rcomp(FUEL_INT_3RD);		
+#elif defined(CONFIG_T959_VER_B5)
+		if((s3c_bat_info.bat_info.level>=16) && (rcomp_status!=0))
+			fuel_gauge_rcomp(FUEL_INT_1ST);
+		else if((s3c_bat_info.bat_info.level<15) && (s3c_bat_info.bat_info.level>=6) && (rcomp_status!=1))
+			fuel_gauge_rcomp(FUEL_INT_2ND);
+		else if((s3c_bat_info.bat_info.level<5) && (rcomp_status!=2))
+			fuel_gauge_rcomp(FUEL_INT_3RD);		
+#endif
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100506
+
 	if (old_level != s3c_bat_info.bat_info.level || old_temp != s3c_bat_info.bat_info.batt_temp ||	old_is_full != s3c_bat_info.bat_info.batt_is_full
 		|| force_update || old_health != s3c_bat_info.bat_info.batt_health)
 	{
@@ -1683,20 +1967,20 @@ static void s3c_bat_status_update(void)
 		force_update = 0;
 		power_supply_changed(&s3c_power_supplies[CHARGER_BATTERY]);
 	}
-
+// [[ NAGSM_Kernel_HDLNC_junghyunseok edit for adding log about device state 20100513
 	if(old_level != s3c_bat_info.bat_info.level || old_is_full != s3c_bat_info.bat_info.batt_is_full || 
 		old_is_recharging!= s3c_bat_info.bat_info.batt_is_recharging || old_health != s3c_bat_info.bat_info.batt_health ||force_log==1)
 	{
-//		pr_info("[BAT]:Vol=%d, Temp=%d, SOC=%d, Lv=%d, ST=%u, TT=%u, CS=%d, CE=%d, RC=%d, FC=%d, Hlth=%d\n", 
-//			s3c_bat_info.bat_info.batt_vol, s3c_bat_info.bat_info.batt_temp, new_temp_level, s3c_bat_info.bat_info.level, start_time_msec, total_time_msec, 
-//			cable_status, s3c_bat_info.bat_info.charging_enabled, s3c_bat_info.bat_info.batt_is_recharging, s3c_bat_info.bat_info.batt_is_full, s3c_bat_info.bat_info.batt_health);
+		pr_info("[BAT]:Vol=%d, Temp=%d, SOC=%d, Lv=%d, ST=%u, TT=%u, CS=%d, CE=%d, RC=%d, FC=%d, Hlth=%d, DS=0x%x\n", 
+			s3c_bat_info.bat_info.batt_vol, s3c_bat_info.bat_info.batt_temp, new_temp_level, s3c_bat_info.bat_info.level, start_time_msec, total_time_msec, 
+			cable_status, s3c_bat_info.bat_info.charging_enabled, s3c_bat_info.bat_info.batt_is_recharging, s3c_bat_info.bat_info.batt_is_full, s3c_bat_info.bat_info.batt_health, s3c_bat_info.device_state);
 		force_log=0;
 	}
-
+// ]] NAGSM_Kernel_HDLNC_junghyunseok edit for adding log about device state 20100513
 }
 
 
-#ifdef __CHECK_BATTERY_V_F__
+#if defined(__CHECK_BATTERY_V_F__)
 static unsigned int s3c_bat_check_v_f(void)
 {
 	unsigned int rc = 0;
@@ -1707,20 +1991,38 @@ static unsigned int s3c_bat_check_v_f(void)
 	adc = s3c_bat_get_adc_data(S3C_ADC_V_F);
 
 	s3c_bat_info.bat_info.batt_v_f_adc=adc;
-
-	//pr_info("[BAT]:%s: V_F ADC = %d\n", __func__, adc);
-
-	if (adc <= BATT_VF_MAX && adc >= BATT_VF_MIN)
+// [junghyunseok edit to remove too many log 20100414
+#ifdef BATTERY_DEBUG
+	pr_info("[BAT]:%s: V_F ADC = %d\n", __func__, adc);
+#endif
+	if ((adc <= BATT_VF_MAX && adc >= BATT_VF_MIN) ||  FSA9480_Get_JIG_Status())
 	{
 		rc = 1;
 	}
 	else
 	{
-		//pr_info("[BAT]:%s: Unauthorized battery!\n", __func__);
+		pr_info("[BAT]:%s: Unauthorized battery!\n", __func__);
 		s3c_set_bat_health(POWER_SUPPLY_HEALTH_UNSPEC_FAILURE);
 		rc = 0;
 	}
 	return rc;
+}
+#elif defined(__PMIC_V_F__)
+static unsigned int s3c_bat_check_v_f(void)
+{
+	unsigned int ret = 0;
+	
+	if( maxim_vf_status() || FSA9480_Get_JIG_Status() )	// bat detected
+	{
+		ret = 1;
+	}
+	else
+	{
+		dev_err(dev, "%s: VF error!\n", __func__);
+		s3c_set_bat_health(POWER_SUPPLY_HEALTH_UNSPEC_FAILURE);
+		ret = 0;
+	}
+	return ret;
 }
 #endif /* __CHECK_BATTERY_V_F__ */
 
@@ -1748,6 +2050,21 @@ static void s3c_store_bat_old_data(void)
 //	pr_info("[BAT]:%s : old_temp=%d, old_level=%d, old_is_full=%d\n", __func__, old_temp, old_level, old_is_full);
 }
 
+// [junghyunseok add to clear temp_adc_data 20100503
+static void s3c_temp_data_clear(void)
+{
+	int tmp_erase =0;
+
+	for(tmp_erase =0; tmp_erase < 10; tmp_erase++){
+	adc_sample[S3C_ADC_TEMPERATURE].adc_arr[tmp_erase]=0;
+		}
+	adc_sample[S3C_ADC_TEMPERATURE].average_adc=0;
+	adc_sample[S3C_ADC_TEMPERATURE].total_adc=0;
+	adc_sample[S3C_ADC_TEMPERATURE].cnt=0;
+	adc_sample[S3C_ADC_TEMPERATURE].index=0;
+}
+// ]junghyunseok add to clear temp_adc_data 20100503
+
 static void s3c_bat_work(struct work_struct *work)
 {
 
@@ -1757,15 +2074,47 @@ static void s3c_bat_work(struct work_struct *work)
 	{
 		return;
 	}
-
+	//NAGSM_Android_SEL_Kernel_Aakash_20100503
+	if (!charging_control_overide)
+	{
+		return;	
+	}
+	//NAGSM_Android_SEL_Kernel_Aakash_20100503
 	mutex_lock(&work_lock);
 
 	s3c_store_bat_old_data();
 	s3c_get_bat_temp();
 	s3c_get_bat_vol();
 	s3c_get_bat_level();
+// [[junghyunseok edit to remove topoff 20100510	
+#ifdef __CHECK_CHG_CURRENT__	
+	if ( (s3c_bat_info.bat_info.batt_vol >= FULL_CHARGE_COND_VOLTAGE)  && s3c_bat_info.bat_info.charging_enabled)
+		{
+			check_chg_current();	
+   	 	}
+#endif
+#ifdef __ADJUST_RECHARGE_ADC__
+	if (s3c_bat_info.bat_info.batt_is_full &&  (!s3c_bat_info.bat_info.charging_enabled))
+		{
+			check_recharging_bat(s3c_bat_info.bat_info.batt_vol);
+		}	
+#endif
+// ]]junghyunseok edit to remove topoff 20100510
 	s3c_bat_charging_control();
 	s3c_cable_status_update();
+#if defined(__CHECK_BATTERY_V_F__) || defined(__PMIC_V_F__)
+	if (s3c_bat_check_v_f() == 0)
+	{
+		// bat_det error -> phone power off?? reset??
+// [[ junghyunseok edit for test pass 20100531
+		if (curent_device_type != PM_CHARGER_NULL)
+		{
+			if (pm_power_off)
+				pm_power_off();
+		}
+// ]] junghyunseok edit for test pass 20100531
+	}
+#endif	
 	s3c_bat_status_update();
 
 	mutex_unlock(&work_lock);
@@ -1795,6 +2144,65 @@ s3c_attrs_failed:
 succeed:        
         return rc;
 }
+
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+irqreturn_t low_battery_isr(int irq, void *dev_id)
+{
+ 	schedule_work(&low_bat_work);
+ 	
+	return IRQ_HANDLED;
+}
+
+static void s3c_low_bat_work(struct work_struct *work)
+{
+  int temp_soc;
+  wake_lock(&low_battery_wake_lock);
+// [[ junghyunseok edit for exception code 20100511
+  if ((temp_soc = fg_read_soc()) < 0)
+  {
+	dev_err(dev, "%s: Can't read soc!!!\n", __func__);
+	temp_soc = s3c_bat_info.bat_info.level;
+  }
+// ]] junghyunseok edit for exception code 20100511  
+  printk("[LBW] RCS= %d, SOC= %d\n", rcomp_status, temp_soc);
+
+  switch (rcomp_status){
+  	case 0:
+		if(temp_soc<=18){
+			fuel_gauge_rcomp(FUEL_INT_2ND);
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 5);
+			}
+		else{
+			fuel_gauge_rcomp(FUEL_INT_1ST);		
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 5);		
+			}
+		break;
+	case 1:
+		if(temp_soc<=8){		
+			fuel_gauge_rcomp(FUEL_INT_3RD);
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 5);
+			}
+		else{
+			fuel_gauge_rcomp(FUEL_INT_2ND);			
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 5);		
+			}
+		break;
+	case 2:
+		if(temp_soc<=3){			
+			low_battery_flag = 1;
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 30);		
+			}
+		else{
+			fuel_gauge_rcomp(FUEL_INT_3RD);			
+			wake_lock_timeout(&low_battery_wake_lock, HZ * 5);		
+			}
+		break;
+	default:
+		dev_err(dev, "%s: wrong rcomp_status value!!!\n", __func__);	// [[ junghyunseok edit for exception code 20100511	
+		break;		
+  }
+}
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 
 static void battery_early_suspend(struct early_suspend *h)
 {
@@ -1846,7 +2254,7 @@ static ssize_t set_fuel_gauge_read_show(struct device *dev, struct device_attrib
 	{
 		s3c_bat_info.bat_info.level = fg_soc;
 	}
-	//printk("%s: soc is  %d!!!\n", __func__, fg_soc);
+	printk("%s: soc is  %d!!!\n", __func__, fg_soc);
 	return sprintf(buf, "%d\n", fg_soc);	
 
 }
@@ -1871,7 +2279,7 @@ static ssize_t set_fuel_gauge_reset_show(struct device *dev, struct device_attri
 	force_update = 1;
 	force_log=1;
 
-	//printk("Enter set_fuel_gauge_reset_show by AT command return vlaue is %d \n", ret_value);
+	printk("Enter set_fuel_gauge_reset_show by AT command return vlaue is %d \n", ret_value);
 	ret_value=0;
 
 	return sprintf(buf,"%d\n", ret_value);
@@ -1888,6 +2296,8 @@ static int __devinit s3c_bat_probe(struct platform_device *pdev)
 {
 	int i;
 	int ret = 0;
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100506	
+	int temp_soc_in_probe;	
 
 	dev = &pdev->dev;
 	//pr_info("[BAT]:%s\n", __func__);
@@ -1917,9 +2327,28 @@ static int __devinit s3c_bat_probe(struct platform_device *pdev)
 	s3c_bat_info.bat_info.batt_temp_adc_aver = 0;
 	s3c_bat_info.bat_info.batt_v_f_adc = 0;
 
+	ce_for_fuelgauge = 0;
+		
 	batt_compensation = 0;
+// [junghyunseok edit for charging block at the bootting time 20100414
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+	count_check_chg_current = 0;
+	count_check_recharging_bat = 0;
+	
+	/* initialize start time for abs timer */
+	event_start_time_msec = 0;
+	event_total_time_msec = 0;
+#endif
 
+	old_cable_status = CHARGER_BATTERY;
+	charging_state = -1;
+// ]junghyunseok edit for charging block at the bootting time 20100414
 	INIT_WORK(&bat_work, s3c_bat_work);
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+	INIT_WORK(&low_bat_work, s3c_low_bat_work);	
+#endif
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 
 	/* init power supplier framework */
 	for (i = 0; i < ARRAY_SIZE(s3c_power_supplies); i++) 
@@ -1927,7 +2356,7 @@ static int __devinit s3c_bat_probe(struct platform_device *pdev)
 		ret = power_supply_register(&pdev->dev, &s3c_power_supplies[i]);
 		if (ret) 
 		{
-			//dev_err(dev, "Failed to register power supply %d,%d\n", i, ret);
+			dev_err(dev, "Failed to register power supply %d,%d\n", i, ret);
 			goto __end__;
 		}
 	}
@@ -1946,16 +2375,57 @@ static int __devinit s3c_bat_probe(struct platform_device *pdev)
 		mod_timer(&polling_timer, jiffies + msecs_to_jiffies(s3c_bat_info.polling_interval));
 	}
 
+// [[ junghyunseok edit for stepcharging 20100506
+      stepcharging_Timer_setup();
+
 	s3c_battery_initial = 1;
 	force_update = 0;
 	force_log=0;
 	full_charge_flag = 0;
-
-	fuel_gauge_rcomp();
 	
-#ifdef __CHECK_BATTERY_V_F__
-	s3c_bat_check_v_f();
-#endif /* __CHECK_BATTERY_V_F__ */
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100506
+// [[ junghyunseok edit for exception code 20100511
+	if ((temp_soc_in_probe = fg_read_soc()) < 0)
+	{
+		dev_err(dev, "%s: Can't read soc!!!\n", __func__);
+		temp_soc_in_probe = s3c_bat_info.bat_info.level;
+	}
+// ]] junghyunseok edit for exception code 20100511	
+#if defined(CONFIG_KEPLER_VER_B2) 
+	if(temp_soc_in_probe>=6){
+		fuel_gauge_rcomp(FUEL_INT_2ND);	
+		}
+	else{
+		fuel_gauge_rcomp(FUEL_INT_3RD);	
+		}
+#elif defined(CONFIG_T959_VER_B5)
+	if(temp_soc_in_probe>=16){
+		fuel_gauge_rcomp(FUEL_INT_1ST);
+		}
+	else if(temp_soc_in_probe>=6){
+		fuel_gauge_rcomp(FUEL_INT_2ND);	
+		}
+	else{
+		fuel_gauge_rcomp(FUEL_INT_3RD);	
+		}
+#else
+		fuel_gauge_rcomp(FUEL_INT_3RD);	
+#endif
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+	    s3c_gpio_cfgpin(GPIO_KBR3, S5PC11X_GPH3_3_EXT_INT33_3);
+		s3c_gpio_setpull(GPIO_KBR3, S3C_GPIO_PULL_NONE);
+
+		set_irq_type(LOW_BATTERY_IRQ, IRQ_TYPE_EDGE_FALLING);
+		ret = request_irq(LOW_BATTERY_IRQ, low_battery_isr, IRQF_SAMPLE_RANDOM, "low battery irq", (void *) pdev);
+
+		if (ret == 0) {
+			printk("low battery interrupt registered \n");
+		}
+		else {
+			printk("request_irq failed\n");
+			return;
+		}
+#endif
 
 	s3c_cable_check_status();
 
@@ -1974,7 +2444,6 @@ static int __devinit s3c_bat_probe(struct platform_device *pdev)
 	}
 
 	fg_atcom_test = device_create(sec_class, NULL, 0, NULL, "fg_atcom_test");
-	
 	if (IS_ERR(fg_atcom_test))
 	{
 		//printk("Failed to create device(fg_atcom_test)!\n");
@@ -1999,8 +2468,12 @@ static int s3c_bat_suspend(struct platform_device *pdev,
 		pm_message_t state)
 {
 	//pr_info("[BAT]:%s\n", __func__);
-
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504	
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)	
+#else
 	set_low_bat_interrupt(1);
+#endif	
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 
 	if (s3c_bat_info.polling)
 	{
@@ -2015,8 +2488,17 @@ static int s3c_bat_resume(struct platform_device *pdev)
 {
 	//pr_info("[BAT]:%s\n", __func__);
 	//wake_lock(&vbus_wake_lock);
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504	
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)	
+#else
 	set_low_bat_interrupt(0);
-	
+#endif	
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504	
+// [junghyunseok add to clear temp_adc_data 20100503	
+#if defined(CONFIG_S5PC110_KEPLER_BOARD) || (defined CONFIG_S5PC110_T959_BOARD)	 || (defined CONFIG_S5PC110_FLEMING_BOARD)
+	s3c_temp_data_clear();
+#endif
+// ]junghyunseok add to clear temp_adc_data 20100503		
 	schedule_work(&bat_work);
 
 	if (s3c_bat_info.polling)
@@ -2060,11 +2542,28 @@ static int __init s3c_bat_init(void)
 	//pr_info("[BAT]:%s\n", __func__);
 
 	wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
-
+// [[junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
+#if defined(CONFIG_KEPLER_VER_B2) || defined(CONFIG_T959_VER_B5)
+    wake_lock_init(&low_battery_wake_lock, WAKE_LOCK_SUSPEND, "low_battery_wake_lock");
+#endif
+// ]]junghyunseok edit for fuel_int interrupt control of fuel_gauge 20100504
 	if (i2c_add_driver(&fg_i2c_driver))
 	{
-		//pr_err("%s: Can't add fg i2c drv\n", __func__);
+		pr_err("%s: Can't add fg i2c drv\n", __func__);
 	}
+
+//NAGSM_Android_SEL_Kernel_Aakash_20100312
+//This FD is implemented to control battery charging via DFTA
+	battery_class = class_create(THIS_MODULE, "batterychrgcntrl");
+	if (IS_ERR(battery_class))
+		pr_err("Failed to create class(batterychrgcntrl)!\n");
+
+	s5pc110bat_dev= device_create(battery_class, NULL, 0, NULL, "charging_control");
+	if (IS_ERR(s5pc110bat_dev))
+		pr_err("Failed to create device(charging_control)!\n");
+	if (device_create_file(s5pc110bat_dev, &dev_attr_usbchargingcon) < 0)
+		pr_err("Failed to create device file(%s)!\n", dev_attr_usbchargingcon.attr.name);
+//NAGSM_Android_SEL_Kernel_Aakash_20100312
 
 	return platform_driver_register(&s3c_bat_driver);
 }

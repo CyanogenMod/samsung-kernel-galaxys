@@ -104,10 +104,13 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (file->private_data == NULL &&
 		    cmd != ANDROID_ALARM_SET_RTC) {
 			spin_lock_irqsave(&alarm_slock, flags);
-			if (alarm_opened) {
+			//NAGSM_Android_SEL_Kernel_Aakash_20100503
+			//This code is disabled from original code in order to allow multiple access to RTC alarm set cmd
+/*			if (alarm_opened) {
 				spin_unlock_irqrestore(&alarm_slock, flags);
 				return -EBUSY;
-			}
+			}*/
+			//NAGSM_Android_SEL_Kernel_Aakash_20100503
 			alarm_opened = 1;
 			file->private_data = (void *)1;
 			spin_unlock_irqrestore(&alarm_slock, flags);
@@ -292,6 +295,9 @@ static int alarm_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+extern int is_under_at_sleep_cmd;	//NAGSM_Android_SEL_Kernel_Aakash_20100503
+extern int get_wakelock_for_AT_SLEEP(void); //NAGSM_Android_SEL_Kernel_Aakash_20100503
+
 static enum hrtimer_restart alarm_timer_triggered(struct hrtimer *timer)
 {
 	unsigned long flags;
@@ -303,10 +309,20 @@ static enum hrtimer_restart alarm_timer_triggered(struct hrtimer *timer)
 			      "alarm_timer_triggered type %d\n", alarm_type);
 	spin_lock_irqsave(&alarm_slock, flags);
 	if (alarm_enabled & alarm_type_mask) {
+		//NAGSM_Android_SEL_Kernel_Aakash_20100503
+		//This piece of code needs to be called before acquiring any other wakelock		
+		if(is_under_at_sleep_cmd){	//This is force sleep mode, so aquire wakelock until dfta is functional again.
+			get_wakelock_for_AT_SLEEP();	//This wakelock will be released when charging reconnection is over.
+			is_under_at_sleep_cmd = 0;
+		}
+		//NAGSM_Android_SEL_Kernel_Aakash_20100503
+
 		wake_lock_timeout(&alarm_wake_lock, 5 * HZ);
+		wake_lock(&alarm_wake_lock);
 		alarm_enabled &= ~alarm_type_mask;
 		alarm_pending |= alarm_type_mask;
 		wake_up(&alarm_wait_queue);
+
 	}
 	spin_unlock_irqrestore(&alarm_slock, flags);
 	return HRTIMER_NORESTART;
