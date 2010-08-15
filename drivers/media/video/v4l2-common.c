@@ -770,7 +770,7 @@ struct v4l2_subdev *v4l2_i2c_new_subdev(struct v4l2_device *v4l2_dev,
 	struct i2c_client *client;
 	struct i2c_board_info info;
 
-	BUG_ON(!dev);
+	BUG_ON(!v4l2_dev);
 
 	if (module_name)
 		request_module(module_name);
@@ -832,7 +832,7 @@ struct v4l2_subdev *v4l2_i2c_new_probed_subdev(struct v4l2_device *v4l2_dev,
 	struct i2c_client *client = NULL;
 	struct i2c_board_info info;
 
-	BUG_ON(!dev);
+	BUG_ON(!v4l2_dev);
 
 	if (module_name)
 		request_module(module_name);
@@ -902,7 +902,7 @@ struct v4l2_subdev *v4l2_i2c_new_subdev_board(struct v4l2_device *v4l2_dev,
 	struct v4l2_subdev *sd = NULL;
 	struct i2c_client *client;
 
-	BUG_ON(!dev);
+	BUG_ON(!v4l2_dev);
 
 	if (module_name)
 		request_module(module_name);
