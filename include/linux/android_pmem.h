@@ -36,7 +36,9 @@
 /* Revokes gpu registers and resets the gpu.  Pass a pointer to the
  * start of the mapped gpu regs (the vaddr returned by mmap) as the argument.
  */
-#define PMEM_CACHE_FLUSH	_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+#define HW3D_REVOKE_GPU		_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+#define HW3D_GRANT_GPU		_IOW(PMEM_IOCTL_MAGIC, 9, unsigned int)
+#define HW3D_WAIT_FOR_INTERRUPT	_IOW(PMEM_IOCTL_MAGIC, 10, unsigned int)
 
 // added by jamie (2009.10.20)
 // in order to provide feature to invalidate cache area
