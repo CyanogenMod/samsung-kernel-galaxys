@@ -25,8 +25,8 @@ if [ "$CPU_JOB_NUM" = "" ] ; then
 	CPU_JOB_NUM=8
 fi
 
-TOOLCHAIN=`pwd`/../prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin/
-TOOLCHAIN_PREFIX=arm-none-eabi-
+TOOLCHAIN=`pwd`/../prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin
+TOOLCHAIN_PREFIX=arm-eabi-
 
 export PRJROOT=$PWD
 export PROJECT_NAME
