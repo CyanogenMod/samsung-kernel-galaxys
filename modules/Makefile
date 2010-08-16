@@ -1,5 +1,9 @@
 ifndef PRJROOT
-    $(error Cannot locate project environment)
+    PRJROOT := "../"
+endif
+
+ifndef KDIR
+    KDIR :="../"
 endif
 
 .PHONY: clean install
