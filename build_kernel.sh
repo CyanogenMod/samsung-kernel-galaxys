@@ -16,8 +16,8 @@ case "$1" in
 		exit
 		;;
 	*)
-		PROJECT_NAME=aries
-		HW_BOARD_REV="03"
+		PROJECT_NAME=cyanogen
+		HW_BOARD_REV="t959"
 		;;
 esac
 
@@ -27,8 +27,6 @@ fi
 
 TOOLCHAIN=`pwd`/../arm-2009q3/bin/
 TOOLCHAIN_PREFIX=arm-none-eabi-
-
-KERNEL_BUILD_DIR=$(PWD)
 
 export PRJROOT=$PWD
 export PROJECT_NAME
@@ -66,17 +64,13 @@ BUILD_KERNEL()
 	echo
 
 
-	pushd $KERNEL_BUILD_DIR
-
 	export KDIR=`pwd`
 
-	make ARCH=arm $PROJECT_NAME"_rev"$HW_BOARD_REV"_defconfig"
+	make ARCH=arm $PROJECT_NAME"_"$HW_BOARD_REV"_defconfig"
 
 	# make kernel
 	make -j$CPU_JOB_NUM HOSTCFLAGS="-g -O2" ARCH=arm CROSS_COMPILE=$TOOLCHAIN/$TOOLCHAIN_PREFIX
 
-	popd
-	
 	BUILD_MODULE
 }
 
