@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29.6
-# Mon Aug 16 06:03:05 2010
+# Mon Aug 16 06:07:39 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -256,9 +256,9 @@ CONFIG_S5PC110_T959_BOARD=y
 # CONFIG_KEPLER_VER_B0 is not set
 # CONFIG_KEPLER_VER_B2 is not set
 # CONFIG_KEPLER_VER_B3 is not set
-CONFIG_BEHOLD3_VER_B0=y
+# CONFIG_BEHOLD3_VER_B0 is not set
 # CONFIG_T959_VER_B0 is not set
-# CONFIG_T959_VER_B5 is not set
+CONFIG_T959_VER_B5=y
 # CONFIG_FLEMING_VER_B0 is not set
 CONFIG_SEC_HEADSET=y
 
