@@ -25,7 +25,7 @@ if [ "$CPU_JOB_NUM" = "" ] ; then
 	CPU_JOB_NUM=8
 fi
 
-TOOLCHAIN=`pwd`/../arm-2009q3/bin/
+TOOLCHAIN=`pwd`/../prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin/
 TOOLCHAIN_PREFIX=arm-none-eabi-
 
 export PRJROOT=$PWD
@@ -69,7 +69,7 @@ BUILD_KERNEL()
 	make ARCH=arm $PROJECT_NAME"_"$HW_BOARD_REV"_defconfig"
 
 	# make kernel
-	make -j$CPU_JOB_NUM HOSTCFLAGS="-g -O2" ARCH=arm CROSS_COMPILE=$TOOLCHAIN/$TOOLCHAIN_PREFIX
+	make -j$CPU_JOB_NUM ARCH=arm CROSS_COMPILE=$TOOLCHAIN/$TOOLCHAIN_PREFIX
 
 	BUILD_MODULE
 }
