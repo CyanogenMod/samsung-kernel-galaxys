@@ -57,9 +57,13 @@ extern unsigned int s5pc11x_cpufreq_index;
 /*APLL_FOUT, MPLL_FOUT, ARMCLK, HCLK_DSYS*/
 static const u32 s5p_sysout_clk_tab_1GHZ[][4] = {
 	// APLL:1000,ARMCLK:1000,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
+	{1200* MHZ, 667 *MHZ, 1200 *MHZ, 166 *MHZ},
+	// APLL:1000,ARMCLK:1000,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
 	{1000* MHZ, 667 *MHZ, 1000 *MHZ, 166 *MHZ},
 	// APLL:800,ARMCLK:800,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
 	{800* MHZ, 667 *MHZ, 800 *MHZ, 166 *MHZ},
+	// APLL:800,ARMCLK:600,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
+	{600* MHZ, 667 *MHZ, 600 *MHZ, 166 *MHZ},
 	// APLL:800,ARMCLK:400,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
 	{800* MHZ, 667 *MHZ, 400 *MHZ, 166 *MHZ},
 	// APLL:800,ARMCLK:267,HCLK_MSYS:200,MPLL:667,HCLK_DSYS:166,HCLK_PSYS:133,PCLK_MSYS:100,PCLK_DSYS:83,PCLK_PSYS:66
@@ -76,18 +80,22 @@ static const u32 s5p_sysout_clk_tab_1GHZ[][4] = {
 /*div0 ratio table*/
 /*apll, a2m, HCLK_MSYS, PCLK_MSYS, HCLK_DSYS, PCLK_DSYS, HCLK_PSYS, PCLK_PSYS, MFC_DIV, G3D_DIV, MSYS source(2D, 3D, MFC)(0->apll,1->mpll), DMC0 div*/
 static const u32 s5p_sys_clk_div0_tab_1GHZ[][DIV_TAB_MAX_FIELD] = {
-        {0, 4, 4, 1, 3, 1, 4, 1, 3, 3, 0, 3},
-        {0, 3, 3, 1, 3, 1, 4, 1, 3, 3, 0, 3},
-        {1, 3, 1, 1, 3, 1, 4, 1, 3, 3, 0, 3},
-        {3, 3, 0, 1, 3, 1, 4, 1, 3, 3, 0, 3},
-        {7, 7, 0, 0, 7, 0, 9, 0, 3, 3, 1, 4},
+        {0, 5, 5, 1, 3, 1, 4, 1, 3, 3, 0, 3}, /* APLL=1.200GHz, MPLL=667MHz, ARMCLK=1.200GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {0, 4, 4, 1, 3, 1, 4, 1, 3, 3, 0, 3}, /* APLL=1.000GHz, MPLL=667MHz, ARMCLK=1.000GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {0, 3, 3, 1, 3, 1, 4, 1, 3, 3, 0, 3}, /* APLL=0.800GHz, MPLL=667MHz, ARMCLK=0.800GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {0, 2, 2, 1, 3, 1, 4, 1, 2, 2, 0, 3}, /* APLL=0.600GHz, MPLL=667MHz, ARMCLK=0.600GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {1, 3, 1, 1, 3, 1, 4, 1, 3, 3, 0, 3}, /* APLL=0.800GHz, MPLL=667MHz, ARMCLK=0.400GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {3, 3, 0, 1, 3, 1, 4, 1, 3, 3, 0, 3}, /* APLL=0.800GHz, MPLL=667MHz, ARMCLK=0.200GHz, SCLKA2M=200MHz, HCLK_MSYS=200MHz */
+        {7, 7, 0, 0, 7, 0, 9, 0, 3, 3, 1, 4}, /* APLL=0.800GHz, MPLL=667MHz, ARMCLK=0.100GHz, SCLKA2M=100MHz, HCLK_MSYS=100MHz */
 };
 
 /*pms value table*/
 /*APLL(m, p, s), MPLL(m, p, s)*/
 static const u32 s5p_sys_clk_mps_tab_1GHZ[][6] = {
+        {300, 6, 1, 667, 12, 1},
         {250, 6, 1, 667, 12, 1},
         {200, 6, 1, 667, 12, 1},
+        {150, 6, 1, 667, 12, 1},
         {200, 6, 1, 667, 12, 1},
         {200, 6, 1, 667, 12, 1},
         {200, 6, 1, 667, 12, 1},

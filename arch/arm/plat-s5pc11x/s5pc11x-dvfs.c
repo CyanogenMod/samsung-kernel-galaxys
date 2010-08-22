@@ -46,12 +46,12 @@
 unsigned int dvfs_change_direction;
 #define CLIP_LEVEL(a, b) (a > b ? b : a)
 
-unsigned int MAXFREQ_LEVEL_SUPPORTED = 4;
-unsigned int S5PC11X_MAXFREQLEVEL = 4;
+unsigned int MAXFREQ_LEVEL_SUPPORTED = 6;
+unsigned int S5PC11X_MAXFREQLEVEL = 6;
 unsigned int S5PC11X_FREQ_TAB;
 //static spinlock_t g_cpufreq_lock = SPIN_LOCK_UNLOCKED;
-static unsigned int s5pc11x_cpufreq_level = 3;
-unsigned int s5pc11x_cpufreq_index = 0;
+static unsigned int s5pc11x_cpufreq_level = 6;
+unsigned int s5pc11x_cpufreq_index = 1;
 
 static char cpufreq_governor_name[CPUFREQ_NAME_LEN] = "conservative";// default governor
 static char userspace_governor[CPUFREQ_NAME_LEN] = "userspace";
@@ -80,11 +80,13 @@ extern unsigned int gbTransitionLogEnable;
 
 /* frequency */
 static struct cpufreq_frequency_table s5pc110_freq_table_1GHZ[] = {
-	{L0, 1000*1000},
-	{L1, 800*1000},
-	{L2, 400*1000},
-	{L3, 200*1000},
-	{L4, 100*1000},
+	{0, 1200*1000},
+	{1, 1000*1000},
+	{2, 800*1000},
+	{3, 600*1000},
+	{4, 400*1000},
+	{5, 200*1000},
+	{6, 100*1000},
 	{0, CPUFREQ_TABLE_END},
 };
 
@@ -93,9 +95,12 @@ static unsigned char transition_state_1GHZ[][2] = {
         {1, 0},
         {2, 0},
         {3, 1},
-        {4, 2},
-        {5, 3},
+        {4, 1},
+        {5, 2},
+	{6, 2},
+	{6, 2}
 };
+
 
 /* frequency */
 static struct cpufreq_frequency_table s5pc110_freq_table_800MHZ[] = {
@@ -127,11 +132,13 @@ static struct cpufreq_frequency_table *s5pc110_freq_table[] = {
 
 static unsigned int s5pc110_thres_table_1GHZ[][2] = {
 //	down threshold, up threshold
-        {40, 70},
-        {30, 90},
-        {30, 70},
-        {30, 70},
-        {30, 70},
+        {60, 70},
+        {55, 90},
+        {50, 85},
+        {50, 85},
+        {35, 85},
+        {35, 85},
+        {35, 85},
 };
 
 static unsigned int s5pc110_thres_table_800MHZ[][2] = {
@@ -713,7 +720,7 @@ static int __init s5pc110_cpu_init(struct cpufreq_policy *policy)
 
 	if (policy->cpu != 0)
 		return -EINVAL;
-	policy->cur = policy->min = policy->max = s5pc110_getspeed(0);
+	policy->cur = policy->min = policy->max = 1000000;
 	//spin_lock_irqsave(&g_cpufreq_lock, irqflags);
 #if 0//boot 800Mhz, kernel 1Ghz
         if(policy->max == MAXIMUM_FREQ) {
@@ -737,8 +744,8 @@ static int __init s5pc110_cpu_init(struct cpufreq_policy *policy)
 	if(s5pc110_verion==1){
 		printk("%s, EVT1 1Ghz Enable\n",__func__);
 		S5PC11X_FREQ_TAB = 0;
-		S5PC11X_MAXFREQLEVEL = 4;
-		MAXFREQ_LEVEL_SUPPORTED = 5;
+		S5PC11X_MAXFREQLEVEL = 6;
+		MAXFREQ_LEVEL_SUPPORTED = 6;
 		g_dvfs_high_lock_limit = 4;
 	}
 	else
