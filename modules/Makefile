@@ -1,70 +1,24 @@
-ifndef PRJROOT
-    PRJROOT := "../"
-endif
-
-ifndef KDIR
-    KDIR :="../"
-endif
-
 .PHONY: clean install
 
-ifeq ($(MODULES_DROP_CACHES),y)
-subdir-y += drop_caches
-endif
-ifeq ($(MODULES_DPRAM),y)
-subdir-y += dpram
-subdir-y += multipdp
-endif
-ifeq ($(MODULES_CAMERA),y)
-subdir-y += camera
-endif
-ifeq ($(MODULES_WLAN),y)
-subdir-y += bcm4329
-endif
-ifeq ($(MODULES_MULTIMEDIA),y)
-subdir-y += pvrsrvkm
-subdir-y += s3clcd
-subdir-y += s3cbc
-endif
-ifeq ($(FLASH_ONENAND),y)
-subdir-y += dpram/fsr
-subdir-y += rfs
-subdir-y += j4fs
-endif
-ifeq ($(MODULES_VIBETONZ),y)
-subdir-y += vibetonz
-endif
-ifeq ($(MODULES_ELED),y)
-subdir-y += eled
-endif
-ifeq ($(MODULES_BTGPIO),y)
-subdir-y += btgpio
-endif
-ifeq ($(MODULES_FMRADIO),y)
-subdir-y += fm_si4709
-endif
-ifeq ($(MODULES_PARAM),y)
-subdir-y += param
+obj-$(CONFIG_MODULES_DROP_CACHES) += drop_caches/
+obj-$(CONFIG_MODULES_DPRAM) += dpram/
+obj-$(CONFIG_MODULES_CAMERA) += camera/
+obj-$(CONFIG_MODULES_WLAN) += bcm4329/
+
+ifeq ($(CONFIG_MODULES_MULTIMEDIA),y)
+obj-y += pvrsrvkm/
+obj-y += s3clcd/
+obj-y += s3cbc/
 endif
 
-SUBDIRS := $(subdir-y)
-
-DO_INSTALL_MODS = y
-
-all: $(SUBDIRS)
-
-$(SUBDIRS)::
-	@$(MAKE) -C $@
-
-install: $(SUBDIRS)
-ifeq ($(strip $(DO_INSTALL_MODS)),y)
-	@for i in `echo $(SUBDIRS)`; do \
-		$(MAKE) --no-print-directory -C $$i $@ > /dev/null 2>&1; \
-	done
+ifeq ($(CONFIG_FLASH_ONENAND),y)
+obj-y += dpram/fsr/
+#obj-y += rfs/
+#obj-y += j4fs/
 endif
-	@$(MAKE) --no-print-directory -C $(KDIR) modules_install
 
-clean:
-	@for i in `echo $(SUBDIRS)`; do \
-		$(MAKE) -C $$i $@; \
-	done
+obj-$(CONFIG_MODULES_VIBETONZ) += vibetonz
+obj-$(CONFIG_MODULES_ELED) += eled
+obj-$(CONFIG_MODULES_BTGPIO) += btgpio
+obj-$(CONFIG_MODULES_FMRADIO) += fm_si4709
+obj-$(CONFIG_MODULES_PARAM) += param
