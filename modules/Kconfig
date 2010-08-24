@@ -1,0 +1,62 @@
+#
+# Samsung Modules
+#
+
+menuconfig MODULES_SAMSUNG
+	bool "Samsung Modules"
+	default y
+
+config MODULES_DROP_CACHES
+	bool "Drop Caches Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_DPRAM
+	bool "DPRAM Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_CAMERA
+	bool "Camera Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_WLAN
+	bool "BCM4329 WLAN Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_MULTIMEDIA
+	bool "Multimedia Modules"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config FLASH_ONENAND
+	bool "FS OneNand - FSR, RFS, J4FS"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_VIBETONZ
+	bool "Vibetonz Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_ELED
+	bool "eLED Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_BTGPIO
+	bool "BTGPIO Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_FMRADIO
+	bool "FM Radio Module"
+	default y
+	depends on MODULES_SAMSUNG && m
+
+config MODULES_PARAM
+ 	bool "Param Module"
+	default y
+	depends on MODULES_SAMSUNG && m

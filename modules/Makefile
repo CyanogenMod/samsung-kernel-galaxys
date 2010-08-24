@@ -18,9 +18,6 @@ endif
 ifeq ($(MODULES_CAMERA),y)
 subdir-y += camera
 endif
-ifeq ($(MODULES_TA),y)
-subdir-y += ta
-endif
 ifeq ($(MODULES_WLAN),y)
 subdir-y += bcm4329
 endif
@@ -30,7 +27,7 @@ subdir-y += s3clcd
 subdir-y += s3cbc
 endif
 ifeq ($(FLASH_ONENAND),y)
-subdir-y += fsr
+subdir-y += dpram/fsr
 subdir-y += rfs
 subdir-y += j4fs
 endif
@@ -40,15 +37,12 @@ endif
 ifeq ($(MODULES_ELED),y)
 subdir-y += eled
 endif
-
 ifeq ($(MODULES_BTGPIO),y)
 subdir-y += btgpio
 endif
-
 ifeq ($(MODULES_FMRADIO),y)
 subdir-y += fm_si4709
 endif
-
 ifeq ($(MODULES_PARAM),y)
 subdir-y += param
 endif
