@@ -1,3 +1,5 @@
+source sammodules/Kconfig
+
 config ARCH
 	string
 	option env="ARCH"

@@ -1,0 +1,3 @@
+config SAMSUNG_MODULES
+	bool "Samsung Modules"
+	depends on S5PC110_T959_BOARD

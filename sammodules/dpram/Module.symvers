@@ -1,0 +1,5 @@
+0x00000000	multipdp_rx_noti_regi	/home/wesgarner/src/modules/dpram/dpram	EXPORT_SYMBOL
+0x00000000	multipdp_buf_copy	/home/wesgarner/src/modules/dpram/dpram	EXPORT_SYMBOL
+0x00000000	multipdp_dump	/home/wesgarner/src/modules/dpram/dpram	EXPORT_SYMBOL
+0x00000000	yhexdump	/home/wesgarner/src/modules/dpram/dpram	EXPORT_SYMBOL
+0x00000000	multipdp_write	/home/wesgarner/src/modules/dpram/dpram	EXPORT_SYMBOL

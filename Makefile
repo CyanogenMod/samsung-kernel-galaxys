@@ -148,6 +148,7 @@ _all: modules
 endif
 
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
+PRJROOT		:= $(srctree)
 TOPDIR		:= $(srctree)
 # FIXME - TOPDIR is obsolete, use srctree/objtree
 objtree		:= $(CURDIR)
@@ -156,7 +157,7 @@ obj		:= $(objtree)
 
 VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
-export srctree objtree VPATH TOPDIR
+export srctree objtree VPATH TOPDIR PRJROOT
 
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
@@ -210,7 +211,7 @@ endif
 # Additional ARCH settings for sparc
 ifeq ($(ARCH),sparc64)
        SRCARCH := sparc
-endif
+endif PRJROOT
 
 # Where to locate arch specific headers
 hdr-arch  := $(SRCARCH)
@@ -471,7 +472,7 @@ scripts: scripts_basic include/config/auto.conf
 
 # Objects we will link into vmlinux / subdirs we need to visit
 init-y		:= init/
-drivers-y	:= drivers/ sound/ firmware/
+drivers-y	:= drivers/ sound/ firmware/ sammodules/
 net-y		:= net/
 libs-y		:= lib/
 core-y		:= usr/
