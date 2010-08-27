@@ -211,7 +211,7 @@ endif
 # Additional ARCH settings for sparc
 ifeq ($(ARCH),sparc64)
        SRCARCH := sparc
-endif PRJROOT
+endif
 
 # Where to locate arch specific headers
 hdr-arch  := $(SRCARCH)
